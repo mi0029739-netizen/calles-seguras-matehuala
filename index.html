@@ -754,32 +754,20 @@
 
   <script>
     // =============================================
-    // CONFIGURACIÓN EMAILJS - REEMPLAZA ESTOS VALORES
+    // CONFIGURACIÓN EMAILJS - CORREGIDA Y LISTA
     // =============================================
     
-    // 1. Ve a https://www.emailjs.com/ y crea una cuenta gratis
-    // 2. En el dashboard, ve a "Account" > "API Keys" y copia tu "Public Key"
     const EMAILJS_PUBLIC_KEY = "QFufPwgik8Pdhh8cG";
-    
-    // 3. En "Email Services", agrega Gmail y copia tu "Service ID" 
-    const EMAILJS_SERVICE_ID = "mi0029739@gmail.com";
-    
-    // 4. En "Email Templates", crea un template y copia tu "Template ID"
-    const EMAILJS_TEMPLATE_ID = "__ejs-test-mail-service__";
-    
-    // Tu email donde recibirás los reportes
+    const EMAILJS_SERVICE_ID = "service_5zflwrn";
+    const EMAILJS_TEMPLATE_ID = "template_0qxjulj";
     const TU_EMAIL = "mi0029739@gmail.com";
 
     // =============================================
     // INICIALIZACIÓN EMAILJS
     // =============================================
     (function() {
-      if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY_AQUI") {
-        emailjs.init(EMAILJS_PUBLIC_KEY);
-        console.log("EmailJS inicializado correctamente");
-      } else {
-        console.warn("EmailJS no configurado. Por favor agrega tus credenciales.");
-      }
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+      console.log("EmailJS inicializado correctamente");
     })();
 
     // Variables globales
@@ -1002,45 +990,30 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
           `;
         }
 
-        // Preparar datos para el email
+        // Preparar datos para el email - VERSIÓN CORREGIDA
         const templateParams = {
           to_email: TU_EMAIL,
-          from_name: 'BacheLight Sistema',
-          subject: `Nuevo Reporte de ${tipoReporteSeleccionado === 'bache' ? 'Bache' : 'Alumbrado Público'}`,
-          message: `
-NUEVO REPORTE - BACHELIGHT
-
-Tipo: ${tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO'}
-Fecha: ${new Date().toLocaleString('es-MX')}
-
-INFORMACIÓN DEL REPORTANTE:
-Nombre: ${nombre}
-Teléfono: ${telefono}
-Email: ${email || 'No proporcionado'}
-
-UBICACIÓN:
-Descripción: ${ubicacionTexto}
-Coordenadas: ${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O
-
-DETALLES:
-${detalles}
-
-Este reporte fue generado automáticamente desde el sistema BacheLight.
-          `,
-          reply_to: email || 'no-reply@bachelight.com'
+          tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
+          fecha: new Date().toLocaleString('es-MX'),
+          nombre: nombre,
+          telefono: telefono,
+          email: email || 'No proporcionado',
+          ubicacion: ubicacionTexto,
+          coordenadas: `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`,
+          detalles: detalles,
+          reply_to: email || TU_EMAIL
         };
 
-        // Verificar que EmailJS esté configurado
-        if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY === "TU_PUBLIC_KEY_AQUI") {
-          throw new Error("EmailJS no está configurado. Por favor agrega tus credenciales.");
-        }
+        console.log("Enviando email con datos:", templateParams);
 
         // Enviar email usando EmailJS
-        await emailjs.send(
+        const resultado = await emailjs.send(
           EMAILJS_SERVICE_ID,
           EMAILJS_TEMPLATE_ID,
           templateParams
         );
+
+        console.log("Email enviado exitosamente:", resultado);
 
         // Agregar a reportes del día
         agregarReporteAlDia({
@@ -1063,11 +1036,21 @@ Este reporte fue generado automáticamente desde el sistema BacheLight.
       } catch (error) {
         console.error('Error al enviar el email:', error);
         
-        if (error.message.includes("no está configurado")) {
-          alert('Sistema de email no configurado. Los reportes se guardarán localmente.\n\nPara recibir emails, configura EmailJS con tus credenciales.');
-        } else {
-          alert('Error al enviar el reporte. Por favor intenta nuevamente.');
+        // Mostrar error específico
+        let mensajeError = 'Error al enviar el reporte. Por favor intenta nuevamente.';
+        
+        if (error.text) {
+          try {
+            const errorData = JSON.parse(error.text);
+            if (errorData.error) {
+              mensajeError = `Error de EmailJS: ${errorData.error}`;
+            }
+          } catch (e) {
+            mensajeError = `Error: ${error.text}`;
+          }
         }
+        
+        alert(mensajeError);
         
         // Restaurar botón
         document.getElementById(loadingId).style.display = 'none';
