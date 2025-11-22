@@ -1,216 +1,1144 @@
 <!DOCTYPE html>
-<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calles Seguras Matehuala</title>
+  <title>BacheLight - Reporta Baches y Alumbrado Público en Matehuala</title>
+  <meta name="description" content="Reporta baches y problemas de alumbrado público en Matehuala. Ayuda a mejorar la seguridad vial de nuestra ciudad.">
+  <meta name="keywords" content="Matehuala, baches, alumbrado público, calles, reportes, seguridad vial, San Luis Potosí, BacheLight">
   <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
     body {
       font-family: Arial, sans-serif;
-      background-image: url('Arcos matehuala.jpg');
-      background-size: cover;
-      background-position: center;
       margin: 0;
       padding: 20px;
       color: #fff;
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
     }
+    
+    /* Fondo animado mejorado */
+    .background-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -2;
+      overflow: hidden;
+    }
+    
+    .moving-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('Arcos matehuala.jpg');
+      background-size: cover;
+      background-position: center;
+      animation: panBackground 60s infinite ease-in-out;
+      filter: brightness(0.8);
+      transform-origin: center;
+    }
+    
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(
+        135deg,
+        rgba(0, 0, 0, 0.7) 0%,
+        rgba(0, 0, 0, 0.4) 50%,
+        rgba(0, 0, 0, 0.7) 100%
+      );
+    }
+    
+    /* Animación del fondo más natural */
+    @keyframes panBackground {
+      0% {
+        transform: scale(1) translate(0%, 0%) rotate(0deg);
+      }
+      25% {
+        transform: scale(1.02) translate(-1%, -0.5%) rotate(0.1deg);
+      }
+      50% {
+        transform: scale(1.01) translate(0.5%, -0.8%) rotate(-0.1deg);
+      }
+      75% {
+        transform: scale(1.02) translate(-0.5%, 0.3%) rotate(0.1deg);
+      }
+      100% {
+        transform: scale(1) translate(0%, 0%) rotate(0deg);
+      }
+    }
+    
+    /* Sistema de nubes más rápidas */
+    .clouds-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: -1;
+    }
+    
+    .cloud {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50px;
+      filter: blur(15px);
+      animation: floatClouds linear infinite;
+    }
+    
+    .cloud::before,
+    .cloud::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      filter: blur(12px);
+    }
+    
+    /* Nubes más rápidas - duraciones reducidas */
+    .cloud-1 {
+      width: 180px;
+      height: 70px;
+      top: 15%;
+      left: -200px;
+      animation-duration: 40s;
+      animation-delay: 0s;
+    }
+    
+    .cloud-1::before {
+      width: 80px;
+      height: 80px;
+      top: -35px;
+      left: 15px;
+    }
+    
+    .cloud-1::after {
+      width: 60px;
+      height: 60px;
+      top: -25px;
+      left: 70px;
+    }
+    
+    .cloud-2 {
+      width: 140px;
+      height: 55px;
+      top: 35%;
+      left: -160px;
+      animation-duration: 35s;
+      animation-delay: 5s;
+    }
+    
+    .cloud-2::before {
+      width: 65px;
+      height: 65px;
+      top: -28px;
+      left: 12px;
+    }
+    
+    .cloud-2::after {
+      width: 45px;
+      height: 45px;
+      top: -18px;
+      left: 55px;
+    }
+    
+    .cloud-3 {
+      width: 100px;
+      height: 40px;
+      top: 65%;
+      left: -120px;
+      animation-duration: 30s;
+      animation-delay: 10s;
+    }
+    
+    .cloud-3::before {
+      width: 50px;
+      height: 50px;
+      top: -20px;
+      left: 10px;
+    }
+    
+    .cloud-3::after {
+      width: 35px;
+      height: 35px;
+      top: -12px;
+      left: 40px;
+    }
+    
+    .cloud-4 {
+      width: 220px;
+      height: 85px;
+      top: 25%;
+      left: -250px;
+      animation-duration: 50s;
+      animation-delay: 15s;
+    }
+    
+    .cloud-4::before {
+      width: 95px;
+      height: 95px;
+      top: -42px;
+      left: 20px;
+    }
+    
+    .cloud-4::after {
+      width: 75px;
+      height: 75px;
+      top: -32px;
+      left: 90px;
+    }
+    
+    .cloud-5 {
+      width: 160px;
+      height: 60px;
+      top: 50%;
+      left: -180px;
+      animation-duration: 45s;
+      animation-delay: 20s;
+    }
+    
+    .cloud-5::before {
+      width: 70px;
+      height: 70px;
+      top: -30px;
+      left: 15px;
+    }
+    
+    .cloud-5::after {
+      width: 50px;
+      height: 50px;
+      top: -20px;
+      left: 65px;
+    }
+    
+    /* Animación de nubes más rápida */
+    @keyframes floatClouds {
+      0% {
+        transform: translateX(0) translateY(0) scale(1);
+        opacity: 0;
+      }
+      5% {
+        opacity: 0.5;
+      }
+      50% {
+        transform: translateX(calc(50vw + 150px)) translateY(-8px) scale(1.03);
+      }
+      95% {
+        opacity: 0.5;
+      }
+      100% {
+        transform: translateX(calc(100vw + 300px)) translateY(-12px) scale(1);
+        opacity: 0;
+      }
+    }
+
+    .container {
+      display: flex;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .main-content {
+      flex: 1;
+    }
+    
+    .reports-sidebar {
+      width: 350px;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    
     h1 {
       color: #fff;
-      text-shadow: 2px 2px 5px black;
+      text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
       text-align: center;
       margin-bottom: 30px;
+      font-size: 3em;
+      font-weight: bold;
+      background: linear-gradient(135deg, #4CAF50, #2196F3);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
+    
+    .reports-sidebar h2 {
+      color: #fff;
+      text-align: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #4CAF50;
+      padding-bottom: 10px;
+    }
+    
+    .report-item {
+      background: rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-left: 4px solid #4CAF50;
+    }
+    
+    .report-item.bache {
+      border-left-color: #ff9800;
+    }
+    
+    .report-item.alumbrado {
+      border-left-color: #2196F3;
+    }
+    
+    .report-type {
+      font-weight: bold;
+      font-size: 12px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 12px;
+      margin-bottom: 5px;
+      display: inline-block;
+    }
+    
+    .report-type.bache {
+      background: #ff9800;
+      color: black;
+    }
+    
+    .report-type.alumbrado {
+      background: #2196F3;
+      color: white;
+    }
+    
+    .report-location {
+      font-weight: bold;
+      margin: 5px 0;
+    }
+    
+    .report-time {
+      font-size: 12px;
+      color: #ccc;
+      margin-top: 5px;
+    }
+    
     form {
-      background-color: rgba(0, 0, 0, 0.75);
-      padding: 20px;
-      border-radius: 10px;
-      max-width: 600px;
-      margin: 0 auto 20px auto;
+      background-color: rgba(0, 0, 0, 0.85);
+      padding: 25px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
     }
+    
     input, textarea, select, button {
       width: 100%;
-      padding: 10px;
-      margin-top: 10px;
+      padding: 12px;
+      margin-top: 8px;
       box-sizing: border-box;
       border: none;
-      border-radius: 5px;
+      border-radius: 8px;
+      font-size: 16px;
     }
+    
+    input:focus, textarea:focus, select:focus {
+      outline: 2px solid #4CAF50;
+    }
+    
     label {
-      margin-top: 10px;
+      margin-top: 15px;
       display: block;
       font-weight: bold;
+      color: #fff;
     }
-    #form-detalles {
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    #form-ubicacion, #form-detalles-bache, #form-detalles-alumbrado {
       display: none;
     }
-    #preview-container {
+    
+    #form-tipo-reporte {
+      display: block;
+    }
+    
+    #preview-container-bache, #preview-container-alumbrado {
       display: none;
       margin-top: 10px;
+      text-align: center;
     }
-    #preview-image {
+    
+    #preview-image-bache, #preview-image-alumbrado {
       max-width: 100%;
-      max-height: 200px;
+      max-height: 250px;
+      border-radius: 8px;
+      border: 2px solid #fff;
+    }
+    
+    button {
+      background: linear-gradient(135deg, #4CAF50, #45a049);
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 20px;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    .btn-secondary {
+      background: linear-gradient(135deg, #6c757d, #5a6268);
+    }
+    
+    #map {
+      height: 300px;
+      width: 100%;
+      border-radius: 8px;
+      margin-top: 10px;
+      border: 2px solid #fff;
+      background: #f8f9fa;
+    }
+    
+    .leaflet-container {
+      background: #f8f9fa !important;
+      font-family: Arial, sans-serif !important;
+    }
+    
+    .coordinates {
+      background: rgba(255,255,255,0.1);
+      padding: 10px;
       border-radius: 5px;
+      margin-top: 10px;
+      font-family: monospace;
+    }
+    
+    .required::after {
+      content: " *";
+      color: #ff4444;
+    }
+    
+    .optional {
+      color: #ccc;
+      font-style: italic;
+    }
+    
+    .type-selector {
+      display: flex;
+      gap: 15px;
+      margin: 20px 0;
+    }
+    
+    .type-option {
+      flex: 1;
+      text-align: center;
+      padding: 20px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 2px solid transparent;
+    }
+    
+    .type-option:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+    }
+    
+    .type-option.selected {
+      border-color: #4CAF50;
+      background: rgba(76, 175, 80, 0.2);
+    }
+    
+    .type-option i {
+      font-size: 40px;
+      margin-bottom: 10px;
+      display: block;
+    }
+    
+    .type-option.bache i {
+      color: #ff9800;
+    }
+    
+    .type-option.alumbrado i {
+      color: #2196F3;
+    }
+    
+    .map-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #666;
+      font-size: 16px;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #4CAF50;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 2s linear infinite;
+      margin: 0 auto 15px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        flex-direction: column;
+      }
+      .reports-sidebar {
+        width: 100%;
+        max-height: 300px;
+      }
+      form {
+        margin: 10px;
+        padding: 20px;
+      }
+      body {
+        padding: 10px;
+      }
+      #map {
+        height: 250px;
+      }
+      .type-selector {
+        flex-direction: column;
+      }
+      h1 {
+        font-size: 2.2em;
+      }
     }
   </style>
-  <!-- Incluir jsPDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- Incluir Leaflet para el mapa -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Incluir EmailJS -->
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <!-- Incluir Font Awesome para íconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
 
-  <h1>Calles Seguras Matehuala</h1>
+  <!-- Fondo animado mejorado -->
+  <div class="background-container">
+    <div class="moving-background"></div>
+    <div class="overlay"></div>
+    <div class="clouds-container">
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>
+      <div class="cloud cloud-4"></div>
+      <div class="cloud cloud-5"></div>
+    </div>
+  </div>
 
-  <form id="form-ubicacion">
-    <label>Ubicación del bache (dirección o coordenadas):</label>
-    <input type="text" id="ubicacion" required>
-    <button type="submit">Enviar ubicación</button>
-  </form>
+  <h1>BacheLight</h1>
 
-  <form id="form-detalles">
-    <h2>Detalles del Bache</h2>
-    <label>Tamaño aproximado (en metros):</label>
-    <input type="text" id="tamano" required>
+  <div class="container">
+    <div class="main-content">
+      <!-- Formulario de selección de tipo de reporte -->
+      <form id="form-tipo-reporte">
+        <h2>¿Qué deseas reportar?</h2>
+        
+        <div class="type-selector">
+          <div class="type-option bache" onclick="seleccionarTipo('bache')">
+            <i class="fas fa-road"></i>
+            <h3>Bache</h3>
+            <p>Problemas en la superficie de la calle</p>
+          </div>
+          <div class="type-option alumbrado" onclick="seleccionarTipo('alumbrado')">
+            <i class="fas fa-lightbulb"></i>
+            <h3>Alumbrado Público</h3>
+            <p>Lámparas dañadas o falta de iluminación</p>
+          </div>
+        </div>
 
-    <label>Profundidad estimada (en cm):</label>
-    <input type="text" id="profundidad" required>
+        <button type="button" onclick="continuarAUbicacion()" style="display: none;" id="btn-continuar">Continuar</button>
+      </form>
 
-    <label>Nivel de peligrosidad:</label>
-    <select id="peligrosidad">
-      <option value="Baja">Baja</option>
-      <option value="Media">Media</option>
-      <option value="Alta">Alta</option>
-    </select>
+      <!-- Formulario de ubicación (común para ambos tipos) -->
+      <form id="form-ubicacion">
+        <h2 id="titulo-ubicacion">Ubicación del Reporte</h2>
+        
+        <div class="form-group">
+          <label class="required">Nombre completo:</label>
+          <input type="text" id="nombre" placeholder="Ingresa tu nombre completo" required>
+        </div>
 
-    <label>Comentarios adicionales:</label>
-    <textarea id="comentarios" rows="4"></textarea>
+        <div class="form-group">
+          <label class="required">Teléfono:</label>
+          <input type="tel" id="telefono" placeholder="Ej. 4481234567" required>
+        </div>
 
-    <label>Foto del bache:</label>
-    <input type="file" id="fotoBache" accept="image/*" required>
-    
-    <div id="preview-container">
-      <p>Vista previa:</p>
-      <img id="preview-image" src="" alt="Vista previa de la imagen">
+        <div class="form-group">
+          <label>Correo electrónico (opcional):</label>
+          <input type="email" id="email" placeholder="tu@correo.com">
+          <small class="optional">Opcional - solo si deseas recibir actualizaciones</small>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Descripción de la ubicación:</label>
+          <input type="text" id="ubicacion-texto" placeholder="Ej: Calle Hidalgo entre Morelos y Juárez, Colonia Centro" required>
+          
+          <label style="margin-top: 20px;">Señala la ubicación exacta en el mapa:</label>
+          <div id="map">
+            <div class="map-loading" id="map-loading">
+              <i class="fas fa-spinner fa-spin"></i> Cargando mapa...
+            </div>
+          </div>
+          <div class="coordinates">
+            <strong>Coordenadas seleccionadas:</strong>
+            <span id="coordenadas">23.6482° N, 100.6430° O</span>
+          </div>
+          <small>💡 Haz clic en el mapa para marcar la ubicación exacta</small>
+        </div>
+
+        <button type="submit">Continuar con los detalles</button>
+        <button type="button" class="btn-secondary" onclick="volverATipo()">Regresar</button>
+      </form>
+
+      <!-- Formulario de detalles para BACHES -->
+      <form id="form-detalles-bache">
+        <h2>Detalles del Bache</h2>
+        
+        <div class="form-group">
+          <label class="required">Tamaño aproximado (en metros):</label>
+          <input type="text" id="tamano-bache" placeholder="Ej. 0.5, 1.2, 2.0" required>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Profundidad estimada (en cm):</label>
+          <input type="text" id="profundidad-bache" placeholder="Ej. 5, 10, 15" required>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Nivel de peligrosidad:</label>
+          <select id="peligrosidad-bache" required>
+            <option value="">Selecciona una opción</option>
+            <option value="Baja">Baja - Poco profundo, en zona de baja velocidad</option>
+            <option value="Media">Media - Profundidad media, en zona transitada</option>
+            <option value="Alta">Alta - Muy profundo, en curva o zona peligrosa</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Comentarios adicionales:</label>
+          <textarea id="comentarios-bache" rows="4" placeholder="Describe cualquier detalle adicional sobre el bache..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Foto del bache:</label>
+          <input type="file" id="fotoBache" accept="image/*" required>
+          <small>📷 Toma una foto clara del bache para mejor identificación</small>
+          
+          <div id="preview-container-bache">
+            <p>Vista previa:</p>
+            <img id="preview-image-bache" src="" alt="Vista previa de la imagen del bache">
+          </div>
+        </div>
+
+        <button type="submit" id="btn-enviar-bache">Enviar Reporte</button>
+        <button type="button" class="btn-secondary" onclick="volverAUbicacion()">Regresar</button>
+        
+        <div class="loading" id="loading-bache">
+          <div class="loading-spinner"></div>
+          <p>Enviando reporte a mi0029739@gmail.com...</p>
+        </div>
+      </form>
+
+      <!-- Formulario de detalles para ALUMBRADO -->
+      <form id="form-detalles-alumbrado">
+        <h2>Detalles del Problema de Alumbrado</h2>
+        
+        <div class="form-group">
+          <label class="required">Tipo de problema:</label>
+          <select id="tipo-problema-alumbrado" required>
+            <option value="">Selecciona una opción</option>
+            <option value="lampara_apagada">Lámpara apagada</option>
+            <option value="lampara_intermitente">Lámpara intermitente</option>
+            <option value="poste_danado">Poste dañado o inclinado</option>
+            <option value="cable_suelto">Cable suelto o peligroso</option>
+            <option value="falta_iluminacion">Falta de iluminación en área</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Número de poste (si es visible):</label>
+          <input type="text" id="numero-poste" placeholder="Ej: Poste #A-125">
+        </div>
+
+        <div class="form-group">
+          <label class="required">Nivel de urgencia:</label>
+          <select id="urgencia-alumbrado" required>
+            <option value="">Selecciona una opción</option>
+            <option value="Baja">Baja - Lámpara apagada, no afecta seguridad</option>
+            <option value="Media">Media - Iluminación intermitente o reducida</option>
+            <option value="Alta">Alta - Poste caído, cable suelto o oscuridad total</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>Comentarios adicionales:</label>
+          <textarea id="comentarios-alumbrado" rows="4" placeholder="Describe el problema con más detalle..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="required">Foto del problema:</label>
+          <input type="file" id="fotoAlumbrado" accept="image/*" required>
+          <small>📷 Toma una foto clara del poste o área afectada</small>
+          
+          <div id="preview-container-alumbrado">
+            <p>Vista previa:</p>
+            <img id="preview-image-alumbrado" src="" alt="Vista previa de la imagen del alumbrado">
+          </div>
+        </div>
+
+        <button type="submit" id="btn-enviar-alumbrado">Enviar Reporte</button>
+        <button type="button" class="btn-secondary" onclick="volverAUbicacion()">Regresar</button>
+        
+        <div class="loading" id="loading-alumbrado">
+          <div class="loading-spinner"></div>
+          <p>Enviando reporte a mi0029739@gmail.com...</p>
+        </div>
+      </form>
     </div>
 
-    <button type="submit">Guardar reporte</button>
-  </form>
-
-  <!-- Contenedor oculto para generar el PDF -->
-  <div id="pdf-container" style="display: none; background: white; color: black; padding: 20px; max-width: 800px;">
-    <h2>Reporte de Bache - Matehuala</h2>
-    <p><strong>Ubicación:</strong> <span id="pdf-ubicacion"></span></p>
-    <p><strong>Tamaño:</strong> <span id="pdf-tamano"></span> metros</p>
-    <p><strong>Profundidad:</strong> <span id="pdf-profundidad"></span> cm</p>
-    <p><strong>Peligrosidad:</strong> <span id="pdf-peligrosidad"></span></p>
-    <p><strong>Comentarios:</strong> <span id="pdf-comentarios"></span></p>
-    <p><strong>Foto del bache:</strong></p>
-    <img id="pdf-imagen" src="" style="max-width: 500px; height: auto;">
+    <!-- Sidebar de reportes recientes -->
+    <div class="reports-sidebar">
+      <h2><i class="fas fa-clock"></i> Reportes de Hoy</h2>
+      <div id="lista-reportes">
+        <div class="report-item">
+          <div class="report-type bache">Bache</div>
+          <div class="report-location">Calle Hidalgo #123</div>
+          <div class="report-desc">Bache profundo en curva</div>
+          <div class="report-time">Hace 15 minutos</div>
+        </div>
+        <div class="report-item">
+          <div class="report-type alumbrado">Alumbrado</div>
+          <div class="report-location">Av. Universidad</div>
+          <div class="report-desc">Lámpara intermitente</div>
+          <div class="report-time">Hace 30 minutos</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
-    const formUbicacion = document.getElementById("form-ubicacion");
-    const formDetalles = document.getElementById("form-detalles");
-    const fotoInput = document.getElementById("fotoBache");
-    const previewContainer = document.getElementById("preview-container");
-    const previewImage = document.getElementById("preview-image");
+    // =============================================
+    // CONFIGURACIÓN EMAILJS - REEMPLAZA ESTOS VALORES
+    // =============================================
+    
+    // 1. Ve a https://www.emailjs.com/ y crea una cuenta gratis
+    // 2. En el dashboard, ve a "Account" > "API Keys" y copia tu "Public Key"
+    const EMAILJS_PUBLIC_KEY = "QFufPwgik8Pdhh8cG";
+    
+    // 3. En "Email Services", agrega Gmail y copia tu "Service ID" 
+    const EMAILJS_SERVICE_ID = "mi0029739@gmail.com";
+    
+    // 4. En "Email Templates", crea un template y copia tu "Template ID"
+    const EMAILJS_TEMPLATE_ID = "__ejs-test-mail-service__";
+    
+    // Tu email donde recibirás los reportes
+    const TU_EMAIL = "mi0029739@gmail.com";
 
-    let ubicacionGuardada = "";
-
-    // Vista previa de la imagen seleccionada
-    fotoInput.addEventListener("change", function() {
-      const file = this.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          previewImage.src = e.target.result;
-          previewContainer.style.display = "block";
-        }
-        reader.readAsDataURL(file);
+    // =============================================
+    // INICIALIZACIÓN EMAILJS
+    // =============================================
+    (function() {
+      if (EMAILJS_PUBLIC_KEY && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY_AQUI") {
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+        console.log("EmailJS inicializado correctamente");
       } else {
-        previewContainer.style.display = "none";
+        console.warn("EmailJS no configurado. Por favor agrega tus credenciales.");
       }
+    })();
+
+    // Variables globales
+    let tipoReporteSeleccionado = '';
+    let mapa = null;
+    let marcador = null;
+    let coordenadasSeleccionadas = { lat: 23.6482, lng: -100.6430 };
+    let reportesDelDia = [];
+    let mapaInicializado = false;
+
+    // Inicializar cuando la página cargue
+    document.addEventListener('DOMContentLoaded', function() {
+      cargarReportesDelDia();
+      mostrarFormularioTipo();
     });
 
-    formUbicacion.addEventListener("submit", function(e) {
+    function inicializarMapa() {
+      if (mapaInicializado) return;
+      
+      try {
+        document.getElementById('map-loading').style.display = 'none';
+        
+        mapa = L.map('map').setView([23.6482, -100.6430], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(mapa);
+
+        marcador = L.marker([23.6482, -100.6430], {
+          draggable: true
+        }).addTo(mapa)
+          .bindPopup('Ubicación del reporte')
+          .openPopup();
+
+        marcador.on('dragend', function(e) {
+          const posicion = marcador.getLatLng();
+          coordenadasSeleccionadas = { lat: posicion.lat, lng: posicion.lng };
+          actualizarCoordenadas();
+        });
+
+        mapa.on('click', function(e) {
+          marcador.setLatLng(e.latlng);
+          coordenadasSeleccionadas = { lat: e.latlng.lat, lng: e.latlng.lng };
+          actualizarCoordenadas();
+        });
+
+        mapaInicializado = true;
+        
+      } catch (error) {
+        console.error('Error al inicializar el mapa:', error);
+        document.getElementById('map-loading').innerHTML = 
+          '<i class="fas fa-exclamation-triangle"></i> Error al cargar el mapa. Recarga la página.';
+      }
+    }
+
+    function actualizarCoordenadas() {
+      const coordenadasElemento = document.getElementById('coordenadas');
+      if (coordenadasElemento) {
+        coordenadasElemento.textContent = 
+          `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`;
+      }
+    }
+
+    // Funciones de navegación entre formularios
+    function seleccionarTipo(tipo) {
+      tipoReporteSeleccionado = tipo;
+      document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
+      event.currentTarget.classList.add('selected');
+      document.getElementById('btn-continuar').style.display = 'block';
+    }
+
+    function continuarAUbicacion() {
+      if (!tipoReporteSeleccionado) {
+        alert('Por favor selecciona un tipo de reporte');
+        return;
+      }
+      document.getElementById('form-tipo-reporte').style.display = 'none';
+      document.getElementById('form-ubicacion').style.display = 'block';
+      document.getElementById('titulo-ubicacion').textContent = 
+        `Ubicación del ${tipoReporteSeleccionado === 'bache' ? 'Bache' : 'Problema de Alumbrado'}`;
+      
+      setTimeout(function() {
+        inicializarMapa();
+      }, 100);
+    }
+
+    function volverATipo() {
+      document.getElementById('form-ubicacion').style.display = 'none';
+      document.getElementById('form-detalles-bache').style.display = 'none';
+      document.getElementById('form-detalles-alumbrado').style.display = 'none';
+      document.getElementById('form-tipo-reporte').style.display = 'block';
+      tipoReporteSeleccionado = '';
+      document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
+      document.getElementById('btn-continuar').style.display = 'none';
+    }
+
+    function volverAUbicacion() {
+      document.getElementById('form-detalles-bache').style.display = 'none';
+      document.getElementById('form-detalles-alumbrado').style.display = 'none';
+      document.getElementById('form-ubicacion').style.display = 'block';
+    }
+
+    function mostrarFormularioTipo() {
+      document.getElementById('form-tipo-reporte').style.display = 'block';
+      document.getElementById('form-ubicacion').style.display = 'none';
+      document.getElementById('form-detalles-bache').style.display = 'none';
+      document.getElementById('form-detalles-alumbrado').style.display = 'none';
+    }
+
+    // Manejo de formularios
+    document.getElementById('form-ubicacion').addEventListener('submit', function(e) {
       e.preventDefault();
-      ubicacionGuardada = document.getElementById("ubicacion").value;
-      formUbicacion.style.display = "none";
-      formDetalles.style.display = "block";
-    });
-
-    formDetalles.addEventListener("submit", function(e) {
-      e.preventDefault();
-
-      const tamano = document.getElementById("tamano").value;
-      const profundidad = document.getElementById("profundidad").value;
-      const peligrosidad = document.getElementById("peligrosidad").value;
-      const comentarios = document.getElementById("comentarios").value;
-      const imagenInput = document.getElementById("fotoBache");
-
-      const archivo = imagenInput.files[0];
-      if (!archivo) {
-        alert("Por favor selecciona una imagen.");
+      
+      const nombre = document.getElementById("nombre").value;
+      const telefono = document.getElementById("telefono").value;
+      const ubicacionTexto = document.getElementById("ubicacion-texto").value;
+      
+      if (!nombre || !telefono || !ubicacionTexto) {
+        alert("Por favor completa todos los campos obligatorios.");
         return;
       }
 
-      const lector = new FileReader();
-      lector.onload = function(evento) {
-        const base64 = evento.target.result;
-        
-        // Llenar el contenedor del PDF
-        document.getElementById('pdf-ubicacion').textContent = ubicacionGuardada;
-        document.getElementById('pdf-tamano').textContent = tamano;
-        document.getElementById('pdf-profundidad').textContent = profundidad;
-        document.getElementById('pdf-peligrosidad').textContent = peligrosidad;
-        document.getElementById('pdf-comentarios').textContent = comentarios;
-        document.getElementById('pdf-imagen').src = base64;
-        
-        // Generar PDF
-        generarPDF();
-      };
-
-      lector.readAsDataURL(archivo);
+      document.getElementById('form-ubicacion').style.display = 'none';
+      
+      if (tipoReporteSeleccionado === 'bache') {
+        document.getElementById('form-detalles-bache').style.display = 'block';
+      } else {
+        document.getElementById('form-detalles-alumbrado').style.display = 'block';
+      }
     });
 
-    function generarPDF() {
-      const { jsPDF } = window.jspdf;
-      
-      // Mostrar el contenedor temporalmente
-      const pdfContainer = document.getElementById('pdf-container');
-      pdfContainer.style.display = 'block';
-      
-      // Usar html2canvas para capturar el contenido
-      html2canvas(pdfContainer).then(canvas => {
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF('p', 'mm', 'a4');
-        const imgWidth = 210; // A4 width in mm
-        const pageHeight = 295; // A4 height in mm
-        const imgHeight = canvas.height * imgWidth / canvas.width;
-        let heightLeft = imgHeight;
-        let position = 0;
+    // Configurar vista previa de imágenes
+    document.getElementById('fotoBache').addEventListener('change', function() {
+      configurarVistaPrevia('bache', this);
+    });
+    
+    document.getElementById('fotoAlumbrado').addEventListener('change', function() {
+      configurarVistaPrevia('alumbrado', this);
+    });
 
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+    function configurarVistaPrevia(tipo, input) {
+      const file = input.files[0];
+      const previewId = `preview-image-${tipo}`;
+      const containerId = `preview-container-${tipo}`;
+      
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          document.getElementById(previewId).src = e.target.result;
+          document.getElementById(containerId).style.display = "block";
+        }
+        reader.readAsDataURL(file);
+      } else {
+        document.getElementById(containerId).style.display = "none";
+      }
+    }
 
-        while (heightLeft >= 0) {
-          position = heightLeft - imgHeight;
-          pdf.addPage();
-          pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-          heightLeft -= pageHeight;
+    // Manejar envío de formularios de detalles
+    document.getElementById('form-detalles-bache').addEventListener('submit', function(e) {
+      e.preventDefault();
+      manejarEnvioReporte();
+    });
+    
+    document.getElementById('form-detalles-alumbrado').addEventListener('submit', function(e) {
+      e.preventDefault();
+      manejarEnvioReporte();
+    });
+
+    async function manejarEnvioReporte() {
+      // Validar campos según el tipo
+      if (tipoReporteSeleccionado === 'bache') {
+        const tamano = document.getElementById("tamano-bache").value;
+        const profundidad = document.getElementById("profundidad-bache").value;
+        const peligrosidad = document.getElementById("peligrosidad-bache").value;
+        const archivo = document.getElementById("fotoBache").files[0];
+
+        if (!tamano || !profundidad || !peligrosidad || !archivo) {
+          alert("Por favor completa todos los campos obligatorios.");
+          return;
+        }
+      } else {
+        const tipoProblema = document.getElementById("tipo-problema-alumbrado").value;
+        const urgencia = document.getElementById("urgencia-alumbrado").value;
+        const archivo = document.getElementById("fotoAlumbrado").files[0];
+
+        if (!tipoProblema || !urgencia || !archivo) {
+          alert("Por favor completa todos los campos obligatorios.");
+          return;
+        }
+      }
+
+      // Mostrar loading
+      const loadingId = `loading-${tipoReporteSeleccionado}`;
+      const buttonId = `btn-enviar-${tipoReporteSeleccionado}`;
+      document.getElementById(loadingId).style.display = 'block';
+      document.getElementById(buttonId).style.display = 'none';
+
+      try {
+        // Obtener datos del formulario
+        const nombre = document.getElementById("nombre").value;
+        const telefono = document.getElementById("telefono").value;
+        const email = document.getElementById("email").value;
+        const ubicacionTexto = document.getElementById("ubicacion-texto").value;
+        
+        let detalles = '';
+        if (tipoReporteSeleccionado === 'bache') {
+          detalles = `
+Tamaño: ${document.getElementById("tamano-bache").value} metros
+Profundidad: ${document.getElementById("profundidad-bache").value} cm
+Peligrosidad: ${document.getElementById("peligrosidad-bache").value}
+Comentarios: ${document.getElementById("comentarios-bache").value || 'No proporcionado'}
+          `;
+        } else {
+          detalles = `
+Tipo de problema: ${document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text}
+Número de poste: ${document.getElementById("numero-poste").value || 'No proporcionado'}
+Urgencia: ${document.getElementById("urgencia-alumbrado").value}
+Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No proporcionado'}
+          `;
         }
 
-        pdf.save('Reporte_Bache_Matehuala.pdf');
+        // Preparar datos para el email
+        const templateParams = {
+          to_email: TU_EMAIL,
+          from_name: 'BacheLight Sistema',
+          subject: `Nuevo Reporte de ${tipoReporteSeleccionado === 'bache' ? 'Bache' : 'Alumbrado Público'}`,
+          message: `
+NUEVO REPORTE - BACHELIGHT
+
+Tipo: ${tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO'}
+Fecha: ${new Date().toLocaleString('es-MX')}
+
+INFORMACIÓN DEL REPORTANTE:
+Nombre: ${nombre}
+Teléfono: ${telefono}
+Email: ${email || 'No proporcionado'}
+
+UBICACIÓN:
+Descripción: ${ubicacionTexto}
+Coordenadas: ${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O
+
+DETALLES:
+${detalles}
+
+Este reporte fue generado automáticamente desde el sistema BacheLight.
+          `,
+          reply_to: email || 'no-reply@bachelight.com'
+        };
+
+        // Verificar que EmailJS esté configurado
+        if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY === "TU_PUBLIC_KEY_AQUI") {
+          throw new Error("EmailJS no está configurado. Por favor agrega tus credenciales.");
+        }
+
+        // Enviar email usando EmailJS
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          templateParams
+        );
+
+        // Agregar a reportes del día
+        agregarReporteAlDia({
+          tipo: tipoReporteSeleccionado,
+          ubicacion: ubicacionTexto,
+          descripcion: tipoReporteSeleccionado === 'bache' ? 
+            `Bache de ${document.getElementById("tamano-bache").value}m` :
+            document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text,
+          timestamp: new Date()
+        });
+
+        // Mostrar mensaje de éxito
+        alert(`¡Reporte enviado exitosamente!\n\nSe ha enviado una notificación a ${TU_EMAIL}\n\nGracias por contribuir a mejorar Matehuala.`);
+
+        // Reiniciar después de 2 segundos
+        setTimeout(function() {
+          location.reload();
+        }, 2000);
+
+      } catch (error) {
+        console.error('Error al enviar el email:', error);
         
-        // Ocultar el contenedor nuevamente
-        pdfContainer.style.display = 'none';
+        if (error.message.includes("no está configurado")) {
+          alert('Sistema de email no configurado. Los reportes se guardarán localmente.\n\nPara recibir emails, configura EmailJS con tus credenciales.');
+        } else {
+          alert('Error al enviar el reporte. Por favor intenta nuevamente.');
+        }
         
-        alert("¡Reporte PDF generado correctamente!");
-        location.reload();
+        // Restaurar botón
+        document.getElementById(loadingId).style.display = 'none';
+        document.getElementById(buttonId).style.display = 'block';
+      }
+    }
+
+    // Sistema de reportes del día
+    function cargarReportesDelDia() {
+      reportesDelDia = [
+        {
+          tipo: 'bache',
+          ubicacion: 'Calle Hidalgo #123',
+          descripcion: 'Bache profundo en curva',
+          timestamp: new Date(Date.now() - 15 * 60 * 1000)
+        },
+        {
+          tipo: 'alumbrado',
+          ubicacion: 'Av. Universidad',
+          descripcion: 'Lámpara intermitente',
+          timestamp: new Date(Date.now() - 30 * 60 * 1000)
+        }
+      ];
+      actualizarListaReportes();
+    }
+
+    function agregarReporteAlDia(reporte) {
+      reportesDelDia.unshift(reporte);
+      if (reportesDelDia.length > 10) {
+        reportesDelDia = reportesDelDia.slice(0, 10);
+      }
+      actualizarListaReportes();
+    }
+
+    function actualizarListaReportes() {
+      const lista = document.getElementById('lista-reportes');
+      lista.innerHTML = '';
+
+      reportesDelDia.forEach(reporte => {
+        const tiempo = calcularTiempoTranscurrido(reporte.timestamp);
+        
+        const item = document.createElement('div');
+        item.className = `report-item ${reporte.tipo}`;
+        item.innerHTML = `
+          <div class="report-type ${reporte.tipo}">${reporte.tipo === 'bache' ? 'Bache' : 'Alumbrado'}</div>
+          <div class="report-location">${reporte.ubicacion}</div>
+          <div class="report-desc">${reporte.descripcion}</div>
+          <div class="report-time">${tiempo}</div>
+        `;
+        lista.appendChild(item);
       });
+
+      if (reportesDelDia.length === 0) {
+        lista.innerHTML = '<div style="text-align: center; color: #ccc; padding: 20px;">No hay reportes hoy</div>';
+      }
+    }
+
+    function calcularTiempoTranscurrido(timestamp) {
+      const ahora = new Date();
+      const diferencia = ahora - timestamp;
+      const minutos = Math.floor(diferencia / (1000 * 60));
+      const horas = Math.floor(diferencia / (1000 * 60 * 60));
+
+      if (horas > 0) {
+        return `Hace ${horas} hora${horas > 1 ? 's' : ''}`;
+      } else if (minutos > 0) {
+        return `Hace ${minutos} minuto${minutos > 1 ? 's' : ''}`;
+      } else {
+        return 'Hace unos momentos';
+      }
     }
   </script>
 </body>
-
 </html>
