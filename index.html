@@ -825,9 +825,48 @@
     </div>
   </div>
 
+  <!-- Firebase SDK -->
+  <script type="module">
+    // =============================================
+    // CONFIGURACIÓN FIREBASE - TU CONFIGURACIÓN
+    // =============================================
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBaxybF2yKX1d_f7k7J9ZuSbH4O4HiB-is",
+      authDomain: "bachelight-af3e6.firebaseapp.com",
+      projectId: "bachelight-af3e6",
+      storageBucket: "bachelight-af3e6.firebasestorage.app",
+      messagingSenderId: "745316634626",
+      appId: "1:745316634626:web:989d7e945b3134ab8c171b",
+      measurementId: "G-20YDDB8R3L"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Hacer Firebase disponible globalmente
+    window.firebase = {
+      db: db,
+      collection: collection,
+      addDoc: addDoc,
+      getDocs: getDocs,
+      query: query,
+      where: where,
+      orderBy: orderBy,
+      limit: limit,
+      onSnapshot: onSnapshot,
+      serverTimestamp: serverTimestamp
+    };
+
+    console.log("Firebase inicializado correctamente");
+  </script>
+
   <script>
     // =============================================
-    // CONFIGURACIÓN EMAILJS - CORREGIDA Y LISTA
+    // CONFIGURACIÓN EMAILJS
     // =============================================
     
     const EMAILJS_PUBLIC_KEY = "QFufPwgik8Pdhh8cG";
@@ -835,9 +874,7 @@
     const EMAILJS_TEMPLATE_ID = "template_0qxjulj";
     const TU_EMAIL = "mi0029739@gmail.com";
 
-    // =============================================
-    // INICIALIZACIÓN EMAILJS
-    // =============================================
+    // Inicializar EmailJS
     (function() {
       emailjs.init(EMAILJS_PUBLIC_KEY);
       console.log("EmailJS inicializado correctamente");
@@ -852,41 +889,128 @@
 
     // Inicializar cuando la página cargue
     document.addEventListener('DOMContentLoaded', function() {
-      cargarReportesDelDia();
+      // Esperar a que Firebase se inicialice
+      setTimeout(() => {
+        cargarReportesDelDia();
+        escucharReportesEnTiempoReal();
+      }, 1000);
       mostrarFormularioTipo();
     });
 
     // =============================================
-    // SISTEMA DE ALMACENAMIENTO DE REPORTES E IMÁGENES
+    // SISTEMA DE BASE DE DATOS FIREBASE
     // =============================================
     
-    function obtenerReportesDelDia() {
-      const hoy = new Date().toDateString();
-      const reportesGuardados = localStorage.getItem(`reportes_${hoy}`);
-      return reportesGuardados ? JSON.parse(reportesGuardados) : [];
+    async function guardarReporteEnFirebase(reporte) {
+      try {
+        // Agregar timestamp para ordenamiento
+        reporte.timestamp = window.firebase.serverTimestamp();
+        reporte.fecha = new Date().toISOString();
+        
+        const docRef = await window.firebase.addDoc(window.firebase.collection(window.firebase.db, 'reportes'), reporte);
+        console.log("Reporte guardado en Firebase con ID:", docRef.id);
+        return docRef.id;
+      } catch (error) {
+        console.error("Error guardando en Firebase:", error);
+        // Fallback a localStorage
+        return guardarReporteLocal(reporte);
+      }
     }
 
-    function guardarReporte(reporte) {
+    async function cargarReportesDelDia() {
+      try {
+        // Obtener reportes de hoy ordenados por fecha (más recientes primero)
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        
+        const q = window.firebase.query(
+          window.firebase.collection(window.firebase.db, 'reportes'),
+          window.firebase.where('fecha', '>=', hoy.toISOString()),
+          window.firebase.orderBy('timestamp', 'desc'),
+          window.firebase.limit(20)
+        );
+        
+        const querySnapshot = await window.firebase.getDocs(q);
+        const reportes = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          reportes.push({
+            id: doc.id,
+            ...data,
+            timestamp: data.timestamp ? data.timestamp.toDate() : new Date(data.fecha)
+          });
+        });
+        
+        actualizarListaReportes(reportes);
+      } catch (error) {
+        console.error("Error cargando reportes:", error);
+        // Fallback a localStorage si Firebase falla
+        cargarReportesDelDiaLocal();
+      }
+    }
+
+    // Función para escuchar reportes en tiempo real
+    function escucharReportesEnTiempoReal() {
+      try {
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        
+        const q = window.firebase.query(
+          window.firebase.collection(window.firebase.db, 'reportes'),
+          window.firebase.where('fecha', '>=', hoy.toISOString()),
+          window.firebase.orderBy('timestamp', 'desc'),
+          window.firebase.limit(20)
+        );
+        
+        window.firebase.onSnapshot(q, (snapshot) => {
+          const reportes = [];
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            reportes.push({
+              id: doc.id,
+              ...data,
+              timestamp: data.timestamp ? data.timestamp.toDate() : new Date(data.fecha)
+            });
+          });
+          actualizarListaReportes(reportes);
+        }, (error) => {
+          console.error("Error en tiempo real:", error);
+        });
+      } catch (error) {
+        console.error("Error iniciando escucha en tiempo real:", error);
+      }
+    }
+
+    // Fallback a localStorage
+    function cargarReportesDelDiaLocal() {
       const hoy = new Date().toDateString();
-      const reportes = obtenerReportesDelDia();
+      const reportesGuardados = localStorage.getItem(`reportes_${hoy}`);
+      const reportes = reportesGuardados ? JSON.parse(reportesGuardados) : [];
+      actualizarListaReportes(reportes);
+    }
+
+    function guardarReporteLocal(reporte) {
+      const hoy = new Date().toDateString();
+      const reportes = obtenerReportesDelDiaLocal();
       reportes.unshift(reporte);
       
-      // Mantener solo los últimos 20 reportes
       if (reportes.length > 20) {
         reportes.splice(20);
       }
       
       localStorage.setItem(`reportes_${hoy}`, JSON.stringify(reportes));
-      return reportes;
+      return "local_" + Date.now();
     }
 
-    function cargarReportesDelDia() {
-      const reportes = obtenerReportesDelDia();
-      actualizarListaReportes(reportes);
+    function obtenerReportesDelDiaLocal() {
+      const hoy = new Date().toDateString();
+      const reportesGuardados = localStorage.getItem(`reportes_${hoy}`);
+      return reportesGuardados ? JSON.parse(reportesGuardados) : [];
     }
 
     // =============================================
-    // FUNCIONES DEL MAPA
+    // FUNCIONES DEL MAPA (IGUAL QUE ANTES)
     // =============================================
     
     function inicializarMapa() {
@@ -938,7 +1062,7 @@
     }
 
     // =============================================
-    // FUNCIONES DE NAVEGACIÓN ENTRE FORMULARIOS
+    // FUNCIONES DE NAVEGACIÓN (IGUAL QUE ANTES)
     // =============================================
     
     function seleccionarTipo(tipo) {
@@ -987,7 +1111,7 @@
     }
 
     // =============================================
-    // MANEJO DE FORMULARIOS
+    // MANEJO DE FORMULARIOS (ACTUALIZADO PARA FIREBASE)
     // =============================================
     
     document.getElementById('form-ubicacion').addEventListener('submit', function(e) {
@@ -1049,7 +1173,7 @@
     });
 
     // =============================================
-    // FUNCIÓN PRINCIPAL DE ENVÍO DE REPORTES - OPCIÓN 1 IMPLEMENTADA
+    // FUNCIÓN PRINCIPAL DE ENVÍO - ACTUALIZADA PARA FIREBASE
     // =============================================
     
     async function manejarEnvioReporte() {
@@ -1112,16 +1236,20 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
           descripcion: tipoReporteSeleccionado === 'bache' ? 
             `Bache de ${document.getElementById("tamano-bache").value}m` :
             document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text,
-          timestamp: new Date(),
           nombre: nombre,
-          tieneImagen: !!archivo
+          telefono: telefono,
+          email: email || 'No proporcionado',
+          coordenadas: coordenadasSeleccionadas,
+          detalles: detalles,
+          tieneImagen: !!archivo,
+          dispositivo: navigator.userAgent
         };
 
-        // OPCIÓN 1 IMPLEMENTADA: Guardar imagen localmente si existe
+        // Guardar imagen localmente si existe
         if (archivo) {
           const reader = new FileReader();
-          reader.onload = function(e) {
-            // Guardar imagen en localStorage
+          reader.onload = async function(e) {
+            // Guardar imagen en localStorage como respaldo
             const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
             const imagenId = 'img_' + Date.now();
             imagenesGuardadas[imagenId] = {
@@ -1134,7 +1262,14 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
             };
             localStorage.setItem('imagenes_reportes', JSON.stringify(imagenesGuardadas));
             
-            // Preparar datos para el email con información de la imagen
+            // Guardar reporte en Firebase
+            const reporteId = await guardarReporteEnFirebase({
+              ...nuevoReporte,
+              imagenId: imagenId,
+              nombreArchivo: archivo.name
+            });
+
+            // Preparar datos para el email
             const templateParams = {
               to_email: TU_EMAIL,
               tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
@@ -1153,11 +1288,14 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
             };
 
             // Enviar email
-            enviarEmailFinal(templateParams, nuevoReporte, loadingId, buttonId);
+            enviarEmailFinal(templateParams, loadingId, buttonId);
           };
           reader.readAsDataURL(archivo);
         } else {
-          // Si no hay imagen, enviar email normal
+          // Guardar reporte en Firebase sin imagen
+          const reporteId = await guardarReporteEnFirebase(nuevoReporte);
+
+          // Preparar datos para el email
           const templateParams = {
             to_email: TU_EMAIL,
             tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
@@ -1172,7 +1310,7 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
             reply_to: email || TU_EMAIL
           };
 
-          enviarEmailFinal(templateParams, nuevoReporte, loadingId, buttonId);
+          enviarEmailFinal(templateParams, loadingId, buttonId);
         }
 
       } catch (error) {
@@ -1184,7 +1322,7 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
     }
 
     // Función para enviar el email final
-    async function enviarEmailFinal(templateParams, nuevoReporte, loadingId, buttonId) {
+    async function enviarEmailFinal(templateParams, loadingId, buttonId) {
       try {
         const resultado = await emailjs.send(
           EMAILJS_SERVICE_ID,
@@ -1193,10 +1331,6 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
         );
 
         console.log("Email enviado exitosamente:", resultado);
-
-        // Guardar reporte localmente
-        const reportesActualizados = guardarReporte(nuevoReporte);
-        actualizarListaReportes(reportesActualizados);
 
         // Mostrar mensaje de éxito
         alert(`¡Reporte enviado exitosamente!\n\nSe ha enviado una notificación a ${TU_EMAIL}\n\nGracias por contribuir a mejorar Matehuala.`);
@@ -1227,7 +1361,7 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
     }
 
     // =============================================
-    // SISTEMA DE REPORTES Y PANEL ADMINISTRATIVO
+    // SISTEMA DE REPORTES - ACTUALIZADO PARA FIREBASE
     // =============================================
     
     function actualizarListaReportes(reportes) {
@@ -1275,7 +1409,7 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
     }
 
     // =============================================
-    // PANEL ADMINISTRATIVO PARA VER IMÁGENES
+    // PANEL ADMINISTRATIVO (IGUAL QUE ANTES)
     // =============================================
     
     function mostrarAdministrador() {
