@@ -512,6 +512,71 @@
       100% { transform: rotate(360deg); }
     }
     
+    /* Estilos para el panel administrativo */
+    .admin-panel {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.9);
+      z-index: 2000;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    
+    .admin-content {
+      background: white;
+      color: black;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .admin-image-item {
+      margin-bottom: 20px;
+      padding: 15px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    
+    .admin-image-item img {
+      max-width: 100%;
+      max-height: 300px;
+      border: 1px solid #ccc;
+    }
+    
+    .admin-btn {
+      background: #ff9800;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    .admin-close-btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      float: right;
+    }
+    
+    .admin-delete-btn {
+      background: red;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    
     @media (max-width: 768px) {
       .container {
         flex-direction: column;
@@ -736,19 +801,27 @@
     <div class="reports-sidebar">
       <h2><i class="fas fa-clock"></i> Reportes de Hoy</h2>
       <div id="lista-reportes">
-        <div class="report-item">
-          <div class="report-type bache">Bache</div>
-          <div class="report-location">Calle Hidalgo #123</div>
-          <div class="report-desc">Bache profundo en curva</div>
-          <div class="report-time">Hace 15 minutos</div>
-        </div>
-        <div class="report-item">
-          <div class="report-type alumbrado">Alumbrado</div>
-          <div class="report-location">Av. Universidad</div>
-          <div class="report-desc">Lámpara intermitente</div>
-          <div class="report-time">Hace 30 minutos</div>
-        </div>
+        <!-- Los reportes se cargarán automáticamente -->
       </div>
+    </div>
+  </div>
+
+  <!-- Botón para ver imágenes -->
+  <button onclick="mostrarAdministrador()" class="admin-btn" style="
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1000;
+  ">
+    📷 Ver Imágenes
+  </button>
+
+  <!-- Panel administrativo para ver imágenes -->
+  <div id="admin-panel" class="admin-panel">
+    <div class="admin-content">
+      <h2>📸 Imágenes de Reportes - Panel Administrativo</h2>
+      <button onclick="cerrarAdministrador()" class="admin-close-btn">Cerrar</button>
+      <div id="lista-imagenes"></div>
     </div>
   </div>
 
@@ -775,7 +848,6 @@
     let mapa = null;
     let marcador = null;
     let coordenadasSeleccionadas = { lat: 23.6482, lng: -100.6430 };
-    let reportesDelDia = [];
     let mapaInicializado = false;
 
     // Inicializar cuando la página cargue
@@ -784,6 +856,39 @@
       mostrarFormularioTipo();
     });
 
+    // =============================================
+    // SISTEMA DE ALMACENAMIENTO DE REPORTES E IMÁGENES
+    // =============================================
+    
+    function obtenerReportesDelDia() {
+      const hoy = new Date().toDateString();
+      const reportesGuardados = localStorage.getItem(`reportes_${hoy}`);
+      return reportesGuardados ? JSON.parse(reportesGuardados) : [];
+    }
+
+    function guardarReporte(reporte) {
+      const hoy = new Date().toDateString();
+      const reportes = obtenerReportesDelDia();
+      reportes.unshift(reporte);
+      
+      // Mantener solo los últimos 20 reportes
+      if (reportes.length > 20) {
+        reportes.splice(20);
+      }
+      
+      localStorage.setItem(`reportes_${hoy}`, JSON.stringify(reportes));
+      return reportes;
+    }
+
+    function cargarReportesDelDia() {
+      const reportes = obtenerReportesDelDia();
+      actualizarListaReportes(reportes);
+    }
+
+    // =============================================
+    // FUNCIONES DEL MAPA
+    // =============================================
+    
     function inicializarMapa() {
       if (mapaInicializado) return;
       
@@ -832,7 +937,10 @@
       }
     }
 
-    // Funciones de navegación entre formularios
+    // =============================================
+    // FUNCIONES DE NAVEGACIÓN ENTRE FORMULARIOS
+    // =============================================
+    
     function seleccionarTipo(tipo) {
       tipoReporteSeleccionado = tipo;
       document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
@@ -878,7 +986,10 @@
       document.getElementById('form-detalles-alumbrado').style.display = 'none';
     }
 
-    // Manejo de formularios
+    // =============================================
+    // MANEJO DE FORMULARIOS
+    // =============================================
+    
     document.getElementById('form-ubicacion').addEventListener('submit', function(e) {
       e.preventDefault();
       
@@ -937,27 +1048,48 @@
       manejarEnvioReporte();
     });
 
+    // =============================================
+    // FUNCIÓN PRINCIPAL DE ENVÍO DE REPORTES - OPCIÓN 1 IMPLEMENTADA
+    // =============================================
+    
     async function manejarEnvioReporte() {
       // Validar campos según el tipo
+      let archivo = null;
+      let detalles = '';
+
       if (tipoReporteSeleccionado === 'bache') {
         const tamano = document.getElementById("tamano-bache").value;
         const profundidad = document.getElementById("profundidad-bache").value;
         const peligrosidad = document.getElementById("peligrosidad-bache").value;
-        const archivo = document.getElementById("fotoBache").files[0];
+        archivo = document.getElementById("fotoBache").files[0];
 
         if (!tamano || !profundidad || !peligrosidad || !archivo) {
           alert("Por favor completa todos los campos obligatorios.");
           return;
         }
+
+        detalles = `
+Tamaño: ${tamano} metros
+Profundidad: ${profundidad} cm
+Peligrosidad: ${peligrosidad}
+Comentarios: ${document.getElementById("comentarios-bache").value || 'No proporcionado'}
+        `;
       } else {
         const tipoProblema = document.getElementById("tipo-problema-alumbrado").value;
         const urgencia = document.getElementById("urgencia-alumbrado").value;
-        const archivo = document.getElementById("fotoAlumbrado").files[0];
+        archivo = document.getElementById("fotoAlumbrado").files[0];
 
         if (!tipoProblema || !urgencia || !archivo) {
           alert("Por favor completa todos los campos obligatorios.");
           return;
         }
+
+        detalles = `
+Tipo de problema: ${document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text}
+Número de poste: ${document.getElementById("numero-poste").value || 'No proporcionado'}
+Urgencia: ${urgencia}
+Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No proporcionado'}
+        `;
       }
 
       // Mostrar loading
@@ -973,40 +1105,87 @@
         const email = document.getElementById("email").value;
         const ubicacionTexto = document.getElementById("ubicacion-texto").value;
         
-        let detalles = '';
-        if (tipoReporteSeleccionado === 'bache') {
-          detalles = `
-Tamaño: ${document.getElementById("tamano-bache").value} metros
-Profundidad: ${document.getElementById("profundidad-bache").value} cm
-Peligrosidad: ${document.getElementById("peligrosidad-bache").value}
-Comentarios: ${document.getElementById("comentarios-bache").value || 'No proporcionado'}
-          `;
-        } else {
-          detalles = `
-Tipo de problema: ${document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text}
-Número de poste: ${document.getElementById("numero-poste").value || 'No proporcionado'}
-Urgencia: ${document.getElementById("urgencia-alumbrado").value}
-Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No proporcionado'}
-          `;
-        }
-
-        // Preparar datos para el email - VERSIÓN CORREGIDA
-        const templateParams = {
-          to_email: TU_EMAIL,
-          tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
-          fecha: new Date().toLocaleString('es-MX'),
-          nombre: nombre,
-          telefono: telefono,
-          email: email || 'No proporcionado',
+        // Crear objeto para el reporte
+        const nuevoReporte = {
+          tipo: tipoReporteSeleccionado,
           ubicacion: ubicacionTexto,
-          coordenadas: `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`,
-          detalles: detalles,
-          reply_to: email || TU_EMAIL
+          descripcion: tipoReporteSeleccionado === 'bache' ? 
+            `Bache de ${document.getElementById("tamano-bache").value}m` :
+            document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text,
+          timestamp: new Date(),
+          nombre: nombre,
+          tieneImagen: !!archivo
         };
 
-        console.log("Enviando email con datos:", templateParams);
+        // OPCIÓN 1 IMPLEMENTADA: Guardar imagen localmente si existe
+        if (archivo) {
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            // Guardar imagen en localStorage
+            const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
+            const imagenId = 'img_' + Date.now();
+            imagenesGuardadas[imagenId] = {
+              data: e.target.result,
+              nombre: archivo.name,
+              fecha: new Date().toISOString(),
+              reporte: nombre + ' - ' + ubicacionTexto,
+              tipo: tipoReporteSeleccionado,
+              detalles: detalles
+            };
+            localStorage.setItem('imagenes_reportes', JSON.stringify(imagenesGuardadas));
+            
+            // Preparar datos para el email con información de la imagen
+            const templateParams = {
+              to_email: TU_EMAIL,
+              tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
+              fecha: new Date().toLocaleString('es-MX'),
+              nombre: nombre,
+              telefono: telefono,
+              email: email || 'No proporcionado',
+              ubicacion: ubicacionTexto,
+              coordenadas: `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`,
+              detalles: detalles,
+              tiene_imagen: 'SÍ',
+              imagen_id: imagenId,
+              nombre_archivo: archivo.name,
+              mensaje_imagen: '📸 IMAGEN GUARDADA LOCALMENTE - Use el panel administrativo para verla',
+              reply_to: email || TU_EMAIL
+            };
 
-        // Enviar email usando EmailJS
+            // Enviar email
+            enviarEmailFinal(templateParams, nuevoReporte, loadingId, buttonId);
+          };
+          reader.readAsDataURL(archivo);
+        } else {
+          // Si no hay imagen, enviar email normal
+          const templateParams = {
+            to_email: TU_EMAIL,
+            tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
+            fecha: new Date().toLocaleString('es-MX'),
+            nombre: nombre,
+            telefono: telefono,
+            email: email || 'No proporcionado',
+            ubicacion: ubicacionTexto,
+            coordenadas: `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`,
+            detalles: detalles,
+            tiene_imagen: 'NO',
+            reply_to: email || TU_EMAIL
+          };
+
+          enviarEmailFinal(templateParams, nuevoReporte, loadingId, buttonId);
+        }
+
+      } catch (error) {
+        console.error('Error en el proceso de envío:', error);
+        document.getElementById(loadingId).style.display = 'none';
+        document.getElementById(buttonId).style.display = 'block';
+        alert('Error al procesar el reporte. Por favor intenta nuevamente.');
+      }
+    }
+
+    // Función para enviar el email final
+    async function enviarEmailFinal(templateParams, nuevoReporte, loadingId, buttonId) {
+      try {
         const resultado = await emailjs.send(
           EMAILJS_SERVICE_ID,
           EMAILJS_TEMPLATE_ID,
@@ -1015,15 +1194,9 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
 
         console.log("Email enviado exitosamente:", resultado);
 
-        // Agregar a reportes del día
-        agregarReporteAlDia({
-          tipo: tipoReporteSeleccionado,
-          ubicacion: ubicacionTexto,
-          descripcion: tipoReporteSeleccionado === 'bache' ? 
-            `Bache de ${document.getElementById("tamano-bache").value}m` :
-            document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text,
-          timestamp: new Date()
-        });
+        // Guardar reporte localmente
+        const reportesActualizados = guardarReporte(nuevoReporte);
+        actualizarListaReportes(reportesActualizados);
 
         // Mostrar mensaje de éxito
         alert(`¡Reporte enviado exitosamente!\n\nSe ha enviado una notificación a ${TU_EMAIL}\n\nGracias por contribuir a mejorar Matehuala.`);
@@ -1035,10 +1208,10 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
 
       } catch (error) {
         console.error('Error al enviar el email:', error);
+        document.getElementById(loadingId).style.display = 'none';
+        document.getElementById(buttonId).style.display = 'block';
         
-        // Mostrar error específico
         let mensajeError = 'Error al enviar el reporte. Por favor intenta nuevamente.';
-        
         if (error.text) {
           try {
             const errorData = JSON.parse(error.text);
@@ -1049,63 +1222,41 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
             mensajeError = `Error: ${error.text}`;
           }
         }
-        
         alert(mensajeError);
-        
-        // Restaurar botón
-        document.getElementById(loadingId).style.display = 'none';
-        document.getElementById(buttonId).style.display = 'block';
       }
     }
 
-    // Sistema de reportes del día
-    function cargarReportesDelDia() {
-      reportesDelDia = [
-        {
-          tipo: 'bache',
-          ubicacion: 'Calle Hidalgo #123',
-          descripcion: 'Bache profundo en curva',
-          timestamp: new Date(Date.now() - 15 * 60 * 1000)
-        },
-        {
-          tipo: 'alumbrado',
-          ubicacion: 'Av. Universidad',
-          descripcion: 'Lámpara intermitente',
-          timestamp: new Date(Date.now() - 30 * 60 * 1000)
-        }
-      ];
-      actualizarListaReportes();
-    }
-
-    function agregarReporteAlDia(reporte) {
-      reportesDelDia.unshift(reporte);
-      if (reportesDelDia.length > 10) {
-        reportesDelDia = reportesDelDia.slice(0, 10);
-      }
-      actualizarListaReportes();
-    }
-
-    function actualizarListaReportes() {
+    // =============================================
+    // SISTEMA DE REPORTES Y PANEL ADMINISTRATIVO
+    // =============================================
+    
+    function actualizarListaReportes(reportes) {
       const lista = document.getElementById('lista-reportes');
       lista.innerHTML = '';
 
-      reportesDelDia.forEach(reporte => {
-        const tiempo = calcularTiempoTranscurrido(reporte.timestamp);
+      if (reportes.length === 0) {
+        lista.innerHTML = '<div style="text-align: center; color: #ccc; padding: 20px;">No hay reportes hoy</div>';
+        return;
+      }
+
+      reportes.forEach(reporte => {
+        const tiempo = calcularTiempoTranscurrido(new Date(reporte.timestamp));
         
         const item = document.createElement('div');
         item.className = `report-item ${reporte.tipo}`;
+        
+        let iconoImagen = reporte.tieneImagen ? ' 📷' : '';
+        
         item.innerHTML = `
-          <div class="report-type ${reporte.tipo}">${reporte.tipo === 'bache' ? 'Bache' : 'Alumbrado'}</div>
+          <div class="report-type ${reporte.tipo}">
+            ${reporte.tipo === 'bache' ? 'Bache' : 'Alumbrado'}
+          </div>
           <div class="report-location">${reporte.ubicacion}</div>
-          <div class="report-desc">${reporte.descripcion}</div>
-          <div class="report-time">${tiempo}</div>
+          <div class="report-desc">${reporte.descripcion}${iconoImagen}</div>
+          <div class="report-time">Por: ${reporte.nombre} • ${tiempo}</div>
         `;
         lista.appendChild(item);
       });
-
-      if (reportesDelDia.length === 0) {
-        lista.innerHTML = '<div style="text-align: center; color: #ccc; padding: 20px;">No hay reportes hoy</div>';
-      }
     }
 
     function calcularTiempoTranscurrido(timestamp) {
@@ -1120,6 +1271,52 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
         return `Hace ${minutos} minuto${minutos > 1 ? 's' : ''}`;
       } else {
         return 'Hace unos momentos';
+      }
+    }
+
+    // =============================================
+    // PANEL ADMINISTRATIVO PARA VER IMÁGENES
+    // =============================================
+    
+    function mostrarAdministrador() {
+      const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
+      const lista = document.getElementById('lista-imagenes');
+      lista.innerHTML = '';
+      
+      if (Object.keys(imagenesGuardadas).length === 0) {
+        lista.innerHTML = '<p>No hay imágenes guardadas.</p>';
+      } else {
+        Object.keys(imagenesGuardadas).forEach(id => {
+          const imagen = imagenesGuardadas[id];
+          const div = document.createElement('div');
+          div.className = 'admin-image-item';
+          div.innerHTML = `
+            <h4>${imagen.reporte}</h4>
+            <p><strong>Tipo:</strong> ${imagen.tipo === 'bache' ? 'Bache' : 'Alumbrado'}</p>
+            <p><strong>Archivo:</strong> ${imagen.nombre}</p>
+            <p><strong>Fecha:</strong> ${new Date(imagen.fecha).toLocaleString()}</p>
+            <p><strong>Detalles:</strong> ${imagen.detalles.replace(/\n/g, '<br>')}</p>
+            <img src="${imagen.data}" alt="Imagen del reporte">
+            <br>
+            <button onclick="eliminarImagen('${id}')" class="admin-delete-btn">Eliminar Imagen</button>
+          `;
+          lista.appendChild(div);
+        });
+      }
+      
+      document.getElementById('admin-panel').style.display = 'block';
+    }
+
+    function cerrarAdministrador() {
+      document.getElementById('admin-panel').style.display = 'none';
+    }
+
+    function eliminarImagen(id) {
+      if (confirm('¿Estás seguro de que quieres eliminar esta imagen?')) {
+        const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
+        delete imagenesGuardadas[id];
+        localStorage.setItem('imagenes_reportes', JSON.stringify(imagenesGuardadas));
+        mostrarAdministrador();
       }
     }
   </script>
