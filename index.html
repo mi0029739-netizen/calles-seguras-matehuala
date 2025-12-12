@@ -1077,7 +1077,13 @@
 
         <div class="form-group">
           <label class="required">Teléfono:</label>
-          <input type="tel" id="telefono" placeholder="Ej. 4481234567" required>
+          <input type="tel" id="telefono" 
+                 placeholder="Ej. 4481234567" 
+                 maxlength="10"
+                 pattern="[0-9]{10}"
+                 oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);"
+                 required>
+          <small class="optional">Solo números, máximo 10 dígitos</small>
         </div>
 
         <div class="form-group">
@@ -1215,7 +1221,10 @@
 
     <!-- Sidebar de reportes recientes - AHORA SE MUESTRAN -->
     <div class="reports-sidebar">
-      <h2><i class="fas fa-clock"></i> Reportes Recientes</h2>
+      <h2 id="sidebar-title">
+        <i class="fas fa-clock"></i> Reportes de Hoy<br>
+        <small style="font-size: 14px; font-weight: normal;" id="fecha-hoy"></small>
+      </h2>
       <div id="lista-reportes">
         <!-- Los reportes REALES se cargarán automáticamente -->
         <div style="text-align: center; color: #ccc; padding: 40px 20px;">
@@ -1278,7 +1287,7 @@
     // CONFIGURACIÓN FIREBASE - TU CONFIGURACIÓN
     // =============================================
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, onSnapshot, serverTimestamp, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where, orderBy, limit, onSnapshot, serverTimestamp, doc, updateDoc, Timestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBaxybF2yKX1d_f7k7J9ZuSbH4O4HiB-is",
@@ -1307,10 +1316,11 @@
       onSnapshot: onSnapshot,
       serverTimestamp: serverTimestamp,
       doc: doc,
-      updateDoc: updateDoc
+      updateDoc: updateDoc,
+      Timestamp: Timestamp
     };
 
-    console.log("Firebase inicializado correctamente");
+    console.log("✅ Firebase inicializado correctamente");
   </script>
 
   <script>
@@ -1326,10 +1336,12 @@
     // Inicializar EmailJS
     (function() {
       emailjs.init(EMAILJS_PUBLIC_KEY);
-      console.log("EmailJS inicializado correctamente");
+      console.log("✅ EmailJS inicializado correctamente");
     })();
 
-    // Variables globales
+    // =============================================
+    // VARIABLES GLOBALES
+    // =============================================
     let tipoReporteSeleccionado = '';
     let mapa = null;
     let marcador = null;
@@ -1340,186 +1352,587 @@
     let mensajePersistenteActual = null;
     let ultimoReporteId = null;
 
-    // Inicializar cuando la página cargue
+    // =============================================
+    // INICIALIZACIÓN
+    // =============================================
     document.addEventListener('DOMContentLoaded', function() {
-      // Esperar a que Firebase se inicialice
-      setTimeout(() => {
-        cargarReportesRecientes(); // Cambiado de cargarReportesDelDia
-        escucharReportesEnTiempoReal();
-        // Eliminada la función de datos de ejemplo
-      }, 1000);
+      console.log("🚀 Inicializando BacheLight...");
+      
+      // Mostrar fecha actual
+      mostrarFechaActual();
+      
+      // Inicializar formulario
       mostrarFormularioTipo();
+      
+      // Esperar a que Firebase se inicialice
+      const intervalo = setInterval(() => {
+        if (window.firebase && window.firebase.db) {
+          clearInterval(intervalo);
+          console.log("🔥 Firebase listo, cargando reportes...");
+          
+          // Cargar reportes inmediatamente
+          cargarReportesRecientes();
+          
+          // Escuchar en tiempo real
+          escucharReportesEnTiempoReal();
+          
+          // También cargar de localStorage inmediatamente
+          setTimeout(() => {
+            const reportesLocales = obtenerReportesDelDiaLocal();
+            if (reportesLocales.length > 0) {
+              console.log("💾 Reportes locales encontrados:", reportesLocales.length);
+              // Actualizar UI con reportes locales
+              actualizarListaReportes([...reportesHoy, ...reportesLocales]);
+            }
+          }, 1000);
+        }
+      }, 500);
     });
 
     // =============================================
-    // SISTEMA DE BASE DE DATOS FIREBASE - MEJORADO
+    // FUNCIONES DE FECHA Y HORA
+    // =============================================
+    
+    function mostrarFechaActual() {
+      const fecha = new Date().toLocaleDateString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      document.getElementById('fecha-hoy').textContent = fecha;
+    }
+
+    function obtenerInicioDia() {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      return hoy;
+    }
+
+    function obtenerFinDia() {
+      const finDia = new Date();
+      finDia.setHours(23, 59, 59, 999);
+      return finDia;
+    }
+
+    function esFechaDeHoy(fecha) {
+      if (!fecha) return false;
+      
+      const fechaObj = fecha.toDate ? fecha.toDate() : new Date(fecha);
+      const hoy = new Date();
+      
+      return fechaObj.getDate() === hoy.getDate() &&
+             fechaObj.getMonth() === hoy.getMonth() &&
+             fechaObj.getFullYear() === hoy.getFullYear();
+    }
+
+    // =============================================
+    // FUNCIÓN MEJORADA: Cargar reportes REALES de HOY
+    // =============================================
+    
+    async function cargarReportesRecientes() {
+      try {
+        const inicioDia = obtenerInicioDia();
+        const finDia = obtenerFinDia();
+        
+        console.log("🔍 Buscando reportes desde:", inicioDia.toLocaleString());
+        console.log("🔍 Hasta:", finDia.toLocaleString());
+        
+        // Usar Timestamp de Firebase para la consulta
+        const inicioTimestamp = window.firebase.Timestamp.fromDate(inicioDia);
+        const finTimestamp = window.firebase.Timestamp.fromDate(finDia);
+        
+        const q = window.firebase.query(
+          window.firebase.collection(window.firebase.db, 'reportes'),
+          window.firebase.where('timestamp', '>=', inicioTimestamp),
+          window.firebase.where('timestamp', '<=', finTimestamp),
+          window.firebase.orderBy('timestamp', 'desc'),
+          window.firebase.limit(50)
+        );
+        
+        const querySnapshot = await window.firebase.getDocs(q);
+        const reportes = [];
+        
+        console.log("📊 Reportes encontrados en Firebase:", querySnapshot.size);
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          
+          // Verificar que sea un reporte real
+          if (data.esReal !== false) {
+            let fechaReporte;
+            
+            // Obtener fecha del reporte
+            if (data.timestamp && data.timestamp.toDate) {
+              fechaReporte = data.timestamp.toDate();
+            } else if (data.fecha) {
+              fechaReporte = new Date(data.fecha);
+            } else {
+              fechaReporte = new Date();
+            }
+            
+            // Solo agregar reportes de HOY
+            if (esFechaDeHoy(fechaReporte)) {
+              reportes.push({
+                id: doc.id,
+                ...data,
+                timestamp: fechaReporte,
+                status: data.status || 'pendiente',
+                fechaFormateada: fechaReporte.toLocaleDateString('es-MX'),
+                tipo: data.tipo || 'desconocido',
+                ubicacion: data.ubicacion || 'Sin ubicación',
+                descripcion: data.descripcion || 'Reporte enviado',
+                nombre: data.nombre || 'Usuario',
+                esReal: data.esReal !== false
+              });
+            }
+          }
+        });
+        
+        console.log(`✅ Cargados ${reportes.length} reportes REALES de HOY`);
+        
+        // Combinar con reportes locales
+        const reportesLocal = obtenerReportesDelDiaLocal();
+        const todosReportes = [...reportes, ...reportesLocal];
+        
+        // Eliminar duplicados
+        const reportesUnicos = eliminarDuplicados(todosReportes);
+        
+        // Ordenar por fecha (más recientes primero)
+        reportesUnicos.sort((a, b) => {
+          const fechaA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+          const fechaB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+          return fechaB - fechaA;
+        });
+        
+        reportesHoy = reportesUnicos;
+        actualizarListaReportes(reportesUnicos);
+        
+        if (reportesUnicos.length === 0) {
+          mostrarListaVacia();
+        }
+        
+      } catch (error) {
+        console.error("❌ Error cargando reportes reales:", error);
+        console.error("Detalles:", error.message);
+        
+        // Fallback a localStorage
+        const reportesLocal = obtenerReportesDelDiaLocal();
+        reportesHoy = reportesLocal;
+        actualizarListaReportes(reportesLocal);
+        
+        if (reportesLocal.length === 0) {
+          mostrarListaVacia();
+        }
+      }
+    }
+
+    // =============================================
+    // FUNCIÓN MEJORADA: Escuchar reportes en tiempo real
+    // =============================================
+    
+    function escucharReportesEnTiempoReal() {
+      try {
+        const inicioDia = obtenerInicioDia();
+        const finDia = obtenerFinDia();
+        
+        console.log("👂 Escuchando reportes en tiempo real...");
+        
+        const inicioTimestamp = window.firebase.Timestamp.fromDate(inicioDia);
+        const finTimestamp = window.firebase.Timestamp.fromDate(finDia);
+        
+        const q = window.firebase.query(
+          window.firebase.collection(window.firebase.db, 'reportes'),
+          window.firebase.where('timestamp', '>=', inicioTimestamp),
+          window.firebase.where('timestamp', '<=', finTimestamp),
+          window.firebase.orderBy('timestamp', 'desc'),
+          window.firebase.limit(50)
+        );
+        
+        window.firebase.onSnapshot(q, (snapshot) => {
+          const reportes = [];
+          
+          snapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data.esReal !== false) {
+              let fechaReporte;
+              
+              if (data.timestamp && data.timestamp.toDate) {
+                fechaReporte = data.timestamp.toDate();
+              } else if (data.fecha) {
+                fechaReporte = new Date(data.fecha);
+              } else {
+                fechaReporte = new Date();
+              }
+              
+              // SOLO reportes de hoy
+              if (esFechaDeHoy(fechaReporte)) {
+                reportes.push({
+                  id: doc.id,
+                  ...data,
+                  timestamp: fechaReporte,
+                  status: data.status || 'pendiente',
+                  tipo: data.tipo || 'desconocido',
+                  ubicacion: data.ubicacion || 'Sin ubicación',
+                  descripcion: data.descripcion || 'Reporte enviado',
+                  nombre: data.nombre || 'Usuario'
+                });
+              }
+            }
+          });
+          
+          console.log(`🔄 Tiempo real: ${reportes.length} reportes de hoy`);
+          
+          // Combinar con reportes locales
+          const reportesLocal = obtenerReportesDelDiaLocal();
+          const todosReportes = [...reportes, ...reportesLocal];
+          
+          // Eliminar duplicados
+          const reportesUnicos = eliminarDuplicados(todosReportes);
+          
+          // Ordenar por fecha
+          reportesUnicos.sort((a, b) => {
+            const fechaA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+            const fechaB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+            return fechaB - fechaA;
+          });
+          
+          // Detectar nuevos reportes
+          if (reportesUnicos.length > reportesHoy.length) {
+            const nuevos = reportesUnicos.length - reportesHoy.length;
+            if (nuevos > 0 && !document.hidden) {
+              document.getElementById('ai-badge').textContent = nuevos;
+              document.getElementById('ai-badge').style.display = 'flex';
+              mostrarNotificacionNuevosReportes(nuevos);
+            }
+          }
+          
+          reportesHoy = reportesUnicos;
+          actualizarListaReportes(reportesUnicos);
+          
+          if (reportesUnicos.length === 0) {
+            mostrarListaVacia();
+          }
+          
+        }, (error) => {
+          console.error("❌ Error en tiempo real:", error);
+        });
+      } catch (error) {
+        console.error("❌ Error iniciando escucha en tiempo real:", error);
+      }
+    }
+
+    // =============================================
+    // FUNCIONES AUXILIARES
+    // =============================================
+    
+    function eliminarDuplicados(reportes) {
+      const idsVistos = new Set();
+      return reportes.filter(reporte => {
+        if (idsVistos.has(reporte.id)) {
+          return false;
+        }
+        idsVistos.add(reporte.id);
+        return true;
+      });
+    }
+
+    function calcularTiempoTranscurrido(timestamp) {
+      if (!timestamp) return 'Reciente';
+      
+      const ahora = new Date();
+      const fecha = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      const diferencia = ahora - fecha;
+      const minutos = Math.floor(diferencia / (1000 * 60));
+      const horas = Math.floor(diferencia / (1000 * 60 * 60));
+      const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+
+      if (dias > 0) {
+        return `Hace ${dias} día${dias > 1 ? 's' : ''}`;
+      } else if (horas > 0) {
+        return `Hace ${horas} hora${horas > 1 ? 's' : ''}`;
+      } else if (minutos > 0) {
+        return `Hace ${minutos} minuto${minutos > 1 ? 's' : ''}`;
+      } else {
+        return 'Hace unos momentos';
+      }
+    }
+
+    // =============================================
+    // FUNCIÓN MEJORADA: Guardar reporte en Firebase
     // =============================================
     
     async function guardarReporteEnFirebase(reporte) {
       try {
-        // Agregar timestamp y datos adicionales
-        reporte.timestamp = window.firebase.serverTimestamp();
-        reporte.fecha = new Date().toISOString();
-        reporte.fechaHora = new Date().toLocaleString('es-MX');
-        reporte.visible = true;
-        reporte.publico = true;
-        reporte.status = 'pendiente';
-        reporte.esReal = true; // Marcar como reporte real
+        const ahora = new Date();
         
-        // Asignar prioridad basada en urgencia
-        if (reporte.tipo === 'alumbrado') {
-          const esAltaUrgencia = reporte.detalles.includes('Urgencia: Alta') || 
-                                reporte.detalles.includes('cable suelto') ||
-                                reporte.detalles.includes('poste caído');
-          reporte.prioridad = esAltaUrgencia ? 'Alta' : 'Media';
-        } else if (reporte.tipo === 'bache') {
-          const esAltaPeligrosidad = reporte.detalles.includes('Peligrosidad: Alta') ||
-                                    reporte.detalles.includes('en curva') ||
-                                    reporte.detalles.includes('peligrosa');
-          reporte.prioridad = esAltaPeligrosidad ? 'Alta' : 'Media';
-        } else {
-          reporte.prioridad = 'Media';
-        }
+        // Crear objeto de reporte completo
+        const reporteCompleto = {
+          ...reporte,
+          timestamp: window.firebase.serverTimestamp(),
+          fecha: ahora.toISOString(),
+          fechaHora: ahora.toLocaleString('es-MX'),
+          visible: true,
+          publico: true,
+          status: 'pendiente',
+          esReal: true,
+          dia: ahora.toDateString(),
+          // Asegurar campos básicos
+          tipo: reporte.tipo || tipoReporteSeleccionado,
+          descripcion: reporte.descripcion || 'Reporte enviado',
+          nombre: reporte.nombre || 'Usuario',
+          ubicacion: reporte.ubicacion || 'Sin ubicación',
+          telefono: reporte.telefono || '',
+          email: reporte.email || 'No proporcionado'
+        };
         
-        console.log("Guardando reporte REAL en Firebase:", reporte);
+        console.log("📤 Guardando reporte en Firebase:", reporteCompleto);
         
         const docRef = await window.firebase.addDoc(
           window.firebase.collection(window.firebase.db, 'reportes'), 
-          reporte
+          reporteCompleto
         );
         
         ultimoReporteId = docRef.id;
-        console.log("✅ Reporte REAL guardado en Firebase con ID:", docRef.id);
+        console.log("✅ Reporte guardado en Firebase con ID:", docRef.id);
         
-        // Agregar inmediatamente a la lista local
+        // Crear objeto para la lista local
         const nuevoReporteConId = {
-          ...reporte,
+          ...reporteCompleto,
           id: docRef.id,
-          timestamp: new Date()
+          timestamp: ahora
         };
         
-        // Solo agregar si es un reporte real
-        if (reporte.esReal) {
-          reportesHoy.unshift(nuevoReporteConId);
-          if (reportesHoy.length > 20) {
-            reportesHoy = reportesHoy.slice(0, 20);
-          }
-          actualizarListaReportes(reportesHoy);
+        // Agregar a la lista local inmediatamente
+        reportesHoy.unshift(nuevoReporteConId);
+        if (reportesHoy.length > 20) {
+          reportesHoy = reportesHoy.slice(0, 20);
         }
+        
+        // Actualizar UI
+        actualizarListaReportes(reportesHoy);
+        
+        // Guardar también en localStorage como respaldo
+        guardarReporteLocal(nuevoReporteConId);
         
         return docRef.id;
         
       } catch (error) {
         console.error("❌ Error guardando en Firebase:", error);
         
-        // Fallback a localStorage
+        // Guardar en localStorage como respaldo
         const idLocal = guardarReporteLocal(reporte);
-        
-        // Mostrar alerta de respaldo
         mostrarAvisoOffline();
         
         return idLocal;
       }
     }
 
-    // Función para cargar reportes REALES y recientes
-    async function cargarReportesRecientes() {
+    // =============================================
+    // FUNCIONES DE LOCALSTORAGE
+    // =============================================
+    
+    function guardarReporteLocal(reporte) {
       try {
-        // Obtener reportes de los últimos 7 días ordenados por fecha (más recientes primero)
-        const hace7Dias = new Date();
-        hace7Dias.setDate(hace7Dias.getDate() - 7);
+        const hoy = new Date().toDateString();
         
-        const q = window.firebase.query(
-          window.firebase.collection(window.firebase.db, 'reportes'),
-          window.firebase.where('fecha', '>=', hace7Dias.toISOString()),
-          window.firebase.where('esReal', '==', true), // Solo reportes reales
-          window.firebase.orderBy('timestamp', 'desc'),
-          window.firebase.limit(15)
-        );
+        // Asegurar que el reporte tenga ID y fecha
+        if (!reporte.id) reporte.id = "local_" + Date.now();
+        if (!reporte.timestamp) reporte.timestamp = new Date();
+        if (!reporte.dia) reporte.dia = hoy;
         
-        const querySnapshot = await window.firebase.getDocs(q);
-        const reportes = [];
+        const reportes = obtenerReportesDelDiaLocal();
         
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          // Verificar que sea un reporte real
-          if (data.esReal !== false) {
-            reportes.push({
-              id: doc.id,
-              ...data,
-              timestamp: data.timestamp ? data.timestamp.toDate() : new Date(data.fecha),
-              status: data.status || 'pendiente'
-            });
+        // Evitar duplicados
+        const existe = reportes.find(r => r.id === reporte.id);
+        if (!existe) {
+          reportes.unshift(reporte);
+          
+          // Mantener máximo 20 reportes
+          if (reportes.length > 20) {
+            reportes.splice(20);
           }
-        });
+          
+          localStorage.setItem(`reportes_reales_${hoy}`, JSON.stringify(reportes));
+          console.log("💾 Reporte guardado localmente:", reporte.id);
+        }
         
-        console.log(`✅ Cargados ${reportes.length} reportes REALES de Firestore`);
-        
-        reportesHoy = reportes;
-        actualizarListaReportes(reportes);
+        return reporte.id;
         
       } catch (error) {
-        console.error("Error cargando reportes reales:", error);
-        // No cargar datos de ejemplo
-        mostrarListaVacia();
+        console.error("Error guardando localmente:", error);
+        return "error_local";
       }
     }
 
-    // Función para escuchar reportes en tiempo real - MEJORADA
-    function escucharReportesEnTiempoReal() {
+    function obtenerReportesDelDiaLocal() {
       try {
-        const hace7Dias = new Date();
-        hace7Dias.setDate(hace7Dias.getDate() - 7);
+        const hoy = new Date().toDateString();
+        const reportesGuardados = localStorage.getItem(`reportes_reales_${hoy}`);
         
-        const q = window.firebase.query(
-          window.firebase.collection(window.firebase.db, 'reportes'),
-          window.firebase.where('fecha', '>=', hace7Dias.toISOString()),
-          window.firebase.where('esReal', '==', true), // Solo reportes reales
-          window.firebase.orderBy('timestamp', 'desc'),
-          window.firebase.limit(15)
-        );
-        
-        window.firebase.onSnapshot(q, (snapshot) => {
-          const reportes = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            // Verificar que sea un reporte real
-            if (data.esReal !== false) {
-              reportes.push({
-                id: doc.id,
-                ...data,
-                timestamp: data.timestamp ? data.timestamp.toDate() : new Date(data.fecha),
-                status: data.status || 'pendiente'
-              });
+        if (reportesGuardados) {
+          const reportes = JSON.parse(reportesGuardados);
+          
+          // Convertir strings de fecha a objetos Date
+          return reportes.map(reporte => {
+            if (typeof reporte.timestamp === 'string') {
+              reporte.timestamp = new Date(reporte.timestamp);
             }
+            return reporte;
           });
-          
-          console.log(`🔄 Tiempo real: ${reportes.length} reportes REALES`);
-          
-          // Actualizar badge de nuevos reportes
-          if (reportes.length > reportesHoy.length) {
-            const nuevos = reportes.length - reportesHoy.length;
-            if (nuevos > 0) {
-              document.getElementById('ai-badge').textContent = nuevos;
-              document.getElementById('ai-badge').style.display = 'flex';
-              
-              // Mostrar notificación de nuevos reportes
-              mostrarNotificacionNuevosReportes(nuevos);
-            }
-          }
-          
-          reportesHoy = reportes;
-          actualizarListaReportes(reportes);
-          
-        }, (error) => {
-          console.error("Error en tiempo real:", error);
-        });
+        }
+        
+        return [];
+        
       } catch (error) {
-        console.error("Error iniciando escucha en tiempo real:", error);
+        console.error("Error obteniendo reportes locales:", error);
+        return [];
       }
     }
 
-    // Función para mostrar notificación de nuevos reportes
+    // =============================================
+    // FUNCIÓN MEJORADA: Mostrar lista de reportes
+    // =============================================
+    
+    function actualizarListaReportes(reportes) {
+      const lista = document.getElementById('lista-reportes');
+      
+      if (!reportes || reportes.length === 0) {
+        mostrarListaVacia();
+        return;
+      }
+
+      // Ordenar por fecha (más recientes primero)
+      const reportesOrdenados = [...reportes].sort((a, b) => {
+        const fechaA = a.timestamp ? new Date(a.timestamp) : new Date(0);
+        const fechaB = b.timestamp ? new Date(b.timestamp) : new Date(0);
+        return fechaB - fechaA;
+      });
+      
+      // Limitar a 15 reportes
+      const reportesMostrar = reportesOrdenados.slice(0, 15);
+      
+      lista.innerHTML = '';
+      
+      let contadorHoy = 0;
+      let contadorFirebase = 0;
+      let contadorLocal = 0;
+      
+      reportesMostrar.forEach(reporte => {
+        try {
+          const fechaReporte = reporte.timestamp ? new Date(reporte.timestamp) : new Date();
+          
+          // Solo mostrar reportes de hoy
+          if (esFechaDeHoy(fechaReporte)) {
+            contadorHoy++;
+            
+            if (reporte.id && reporte.id.startsWith('local_')) {
+              contadorLocal++;
+            } else {
+              contadorFirebase++;
+            }
+            
+            const tiempo = calcularTiempoTranscurrido(fechaReporte);
+            const tieneImagen = reporte.tieneImagen ? ' 📷' : '';
+            const status = reporte.status || 'pendiente';
+            const statusText = status === 'pendiente' ? 'Pendiente' :
+                              status === 'en-proceso' ? 'En proceso' : 'Resuelto';
+            const statusClass = status === 'pendiente' ? 'status-pendiente' :
+                               status === 'en-proceso' ? 'status-en-proceso' : 'status-resuelto';
+            
+            const item = document.createElement('div');
+            item.className = `report-item ${reporte.tipo}`;
+            item.onclick = () => mostrarDetalleReporte(reporte);
+            item.style.cursor = 'pointer';
+            
+            // Mostrar solo primer nombre
+            const nombreMostrar = reporte.nombre ? reporte.nombre.split(' ')[0] : 'Usuario';
+            
+            item.innerHTML = `
+              <div style="display: flex; justify-content: space-between; align-items: start;">
+                <div class="report-type ${reporte.tipo}">
+                  ${reporte.tipo === 'bache' ? 'Bache' : 'Alumbrado'}
+                </div>
+                <span class="report-status ${statusClass}">${statusText}</span>
+              </div>
+              <div class="report-location">${reporte.ubicacion || 'Sin ubicación'}</div>
+              <div class="report-desc">${reporte.descripcion || 'Reporte enviado'}${tieneImagen}</div>
+              <div class="report-time">
+                <i class="fas fa-user"></i> Reportado por ${nombreMostrar} • 
+                <i class="fas fa-clock"></i> ${tiempo}
+                ${reporte.id && reporte.id.startsWith('local_') ? 
+                  '<br><small style="color: #ff9800; font-size: 10px;">🔄 Pendiente de sincronizar</small>' : ''}
+              </div>
+            `;
+            lista.appendChild(item);
+          }
+        } catch (error) {
+          console.error("Error procesando reporte:", error);
+        }
+      });
+      
+      if (contadorHoy === 0) {
+        mostrarListaVacia();
+        return;
+      }
+      
+      // Mostrar contador
+      const contador = document.createElement('div');
+      contador.style.cssText = `
+        text-align: center;
+        margin-top: 20px;
+        padding: 10px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        font-size: 14px;
+      `;
+      
+      let infoExtra = '';
+      if (contadorLocal > 0) {
+        infoExtra = `<br><small style="color: #ff9800;">🔄 ${contadorLocal} pendiente(s) de sincronizar</small>`;
+      }
+      
+      contador.innerHTML = `
+        <i class="fas fa-calendar-day"></i> <strong>${contadorHoy} reportes de hoy</strong>
+        <br><small style="color: #aaa;">${contadorFirebase} en tiempo real${infoExtra}</small>
+      `;
+      lista.appendChild(contador);
+    }
+
+    function mostrarListaVacia() {
+      const lista = document.getElementById('lista-reportes');
+      const hoy = new Date().toLocaleDateString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      lista.innerHTML = `
+        <div style="text-align: center; color: #ccc; padding: 40px 20px;">
+          <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+          <h3 style="margin-bottom: 10px; color: #4CAF50;">¡Sé el primero hoy!</h3>
+          <p>Hoy <strong>${hoy}</strong> aún no hay reportes</p>
+          <p style="margin-top: 15px;">Sé el primero en reportar un problema en Matehuala</p>
+          <div style="
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            border-left: 3px solid #4CAF50;
+          ">
+            <p style="font-size: 12px; margin: 0; color: #aaa;">
+              <i class="fas fa-info-circle"></i> Los reportes de otras personas aparecerán aquí automáticamente cuando los envíen
+            </p>
+          </div>
+        </div>
+      `;
+    }
+
+    // =============================================
+    // NOTIFICACIONES Y AVISOS
+    // =============================================
+    
     function mostrarNotificacionNuevosReportes(cantidad) {
       const notificacion = document.createElement('div');
       notificacion.style.cssText = `
@@ -1546,7 +1959,6 @@
       
       document.body.appendChild(notificacion);
       
-      // Auto-eliminar después de 5 segundos
       setTimeout(() => {
         notificacion.style.animation = 'slideOutUp 0.5s ease forwards';
         setTimeout(() => {
@@ -1557,7 +1969,6 @@
       }, 5000);
     }
 
-    // Función para mostrar aviso offline
     function mostrarAvisoOffline() {
       if (document.getElementById('aviso-offline')) return;
       
@@ -1585,7 +1996,6 @@
       
       document.body.appendChild(avisoDiv);
       
-      // Auto-eliminar después de 10 segundos
       setTimeout(() => {
         if (avisoDiv.parentNode) {
           avisoDiv.style.animation = 'slideOutRight 0.5s ease forwards';
@@ -1598,462 +2008,10 @@
       }, 10000);
     }
 
-    // Fallback a localStorage (solo para emergencias)
-    function guardarReporteLocal(reporte) {
-      const hoy = new Date().toDateString();
-      const reportes = obtenerReportesDelDiaLocal();
-      reporte.id = "local_" + Date.now();
-      reporte.timestamp = new Date();
-      reporte.status = 'pendiente';
-      reporte.publico = true;
-      reporte.visible = true;
-      reporte.esReal = true;
-      reportes.unshift(reporte);
-      
-      if (reportes.length > 10) {
-        reportes.splice(10);
-      }
-      
-      localStorage.setItem(`reportes_reales_${hoy}`, JSON.stringify(reportes));
-      reportesHoy = reportes;
-      actualizarListaReportes(reportes);
-      
-      return reporte.id;
-    }
-
-    function obtenerReportesDelDiaLocal() {
-      const hoy = new Date().toDateString();
-      const reportesGuardados = localStorage.getItem(`reportes_reales_${hoy}`);
-      return reportesGuardados ? JSON.parse(reportesGuardados) : [];
-    }
-
-    // Función para mostrar lista vacía
-    function mostrarListaVacia() {
-      const lista = document.getElementById('lista-reportes');
-      lista.innerHTML = `
-        <div style="text-align: center; color: #ccc; padding: 40px 20px;">
-          <i class="fas fa-inbox" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
-          <h3 style="margin-bottom: 10px;">No hay reportes recientes</h3>
-          <p>Sé el primero en reportar un problema en Matehuala</p>
-          <p style="font-size: 12px; margin-top: 10px; color: #999;">
-            <i class="fas fa-info-circle"></i> Los reportes de otras personas aparecerán aquí automáticamente
-          </p>
-        </div>
-      `;
-    }
-
     // =============================================
-    // SISTEMA DE IA PARA RESPUESTAS - CORREGIDO
+    // FUNCIONES DEL FORMULARIO
     // =============================================
     
-    async function generarRespuestaIA(reporte) {
-      // Esta función genera respuestas REALES basadas en el reporte
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simular procesamiento
-      
-      const tipo = reporte.tipo === 'bache' ? 'bache' : 'problema de alumbrado';
-      const ubicacion = reporte.ubicacion;
-      const nombre = reporte.nombre.split(' ')[0]; // Solo primer nombre
-      const fecha = new Date().toLocaleDateString('es-MX');
-      const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-      
-      // Análisis REAL basado en los datos
-      let prioridad = 'Media';
-      let tiempoEstimado = '2-3 días';
-      let estado = 'En proceso';
-      let iconoEstado = '✅';
-      let colorEstado = '#4CAF50';
-      let colorPrioridad = '#ff9800';
-      
-      // Determinar prioridad REAL
-      if (reporte.tipo === 'bache') {
-        if (reporte.detalles.includes('Peligrosidad: Alta') || 
-            reporte.detalles.includes('Alta') && reporte.detalles.includes('peligrosidad')) {
-          prioridad = 'Alta';
-          tiempoEstimado = '24 horas';
-          estado = 'Urgente';
-          iconoEstado = '🚨';
-          colorEstado = '#f44336';
-          colorPrioridad = '#f44336';
-        } else if (reporte.detalles.includes('Peligrosidad: Media')) {
-          prioridad = 'Media';
-          tiempoEstimado = '2-3 días';
-          estado = 'En proceso';
-          iconoEstado = '⚠️';
-          colorEstado = '#ff9800';
-          colorPrioridad = '#ff9800';
-        } else {
-          prioridad = 'Baja';
-          tiempoEstimado = '5-7 días';
-          estado = 'Pendiente';
-          iconoEstado = 'ℹ️';
-          colorEstado = '#2196F3';
-          colorPrioridad = '#2196F3';
-        }
-      } else { // Alumbrado
-        if (reporte.detalles.includes('Urgencia: Alta') || 
-            reporte.detalles.includes('cable suelto') ||
-            reporte.detalles.includes('poste caído')) {
-          prioridad = 'Alta';
-          tiempoEstimado = '24-48 horas';
-          estado = 'Urgente';
-          iconoEstado = '🚨';
-          colorEstado = '#f44336';
-          colorPrioridad = '#f44336';
-        } else if (reporte.detalles.includes('Urgencia: Media')) {
-          prioridad = 'Media';
-          tiempoEstimado = '3-4 días';
-          estado = 'En proceso';
-          iconoEstado = '⚠️';
-          colorEstado = '#ff9800';
-          colorPrioridad = '#ff9800';
-        } else {
-          prioridad = 'Baja';
-          tiempoEstimado = '7-10 días';
-          estado = 'Programado';
-          iconoEstado = '📅';
-          colorEstado = '#2196F3';
-          colorPrioridad = '#2196F3';
-        }
-      }
-      
-      const mensaje = `Hola ${nombre},\n\n` +
-                     `${iconoEstado} **Tu reporte ha sido recibido correctamente**\n\n` +
-                     `📍 **Ubicación:** ${ubicacion}\n` +
-                     `📅 **Fecha y hora:** ${fecha} a las ${hora}\n` +
-                     `📊 **Prioridad asignada:** ${prioridad}\n` +
-                     `⏱️ **Tiempo estimado de atención:** ${tiempoEstimado}\n` +
-                     `📋 **Estado actual:** ${estado}\n\n` +
-                     `✅ **Tu reporte ya es visible para otras personas**\n` +
-                     `👥 **Otros usuarios pueden verlo en la lista de reportes**\n\n` +
-                     `🙏 **Gracias por ayudar a mejorar Matehuala.**`;
-      
-      return {
-        prioridad: prioridad,
-        tiempoEstimado: tiempoEstimado,
-        estado: estado,
-        iconoEstado: iconoEstado,
-        colorEstado: colorEstado,
-        colorPrioridad: colorPrioridad,
-        fecha: fecha,
-        hora: hora,
-        nombre: nombre,
-        tipo: tipo,
-        ubicacion: ubicacion,
-        mensaje: mensaje,
-        puedeAtender: true
-      };
-    }
-
-    // Función para mostrar mensaje PERSISTENTE de la IA - CORREGIDO
-    function mostrarRespuestaIAPersistente(respuesta) {
-      // Remover mensaje anterior si existe
-      if (mensajePersistenteActual) {
-        mensajePersistenteActual.remove();
-      }
-      
-      // Crear elemento para el mensaje persistente
-      const mensajeDiv = document.createElement('div');
-      mensajeDiv.className = 'ai-persistent-message';
-      mensajeDiv.id = 'ai-persistent-message';
-      
-      mensajeDiv.innerHTML = `
-        <div class="ai-persistent-header" style="background: linear-gradient(135deg, ${respuesta.colorEstado}, ${respuesta.colorPrioridad});">
-          <h3>
-            <i class="fas fa-robot"></i>
-            Respuesta de BacheLight AI
-          </h3>
-          <button class="ai-persistent-close" onclick="cerrarMensajeIA()" title="Cerrar mensaje">
-            ✖
-          </button>
-        </div>
-        <div class="ai-persistent-content">
-          <div class="ai-persistent-status">
-            <div class="ai-persistent-status-item">
-              <div class="ai-persistent-status-label">Prioridad</div>
-              <div class="ai-persistent-status-value" style="color: ${respuesta.colorPrioridad};">${respuesta.prioridad}</div>
-            </div>
-            <div class="ai-persistent-status-item">
-              <div class="ai-persistent-status-label">Tiempo estimado</div>
-              <div class="ai-persistent-status-value" style="color: #2196F3;">${respuesta.tiempoEstimado}</div>
-            </div>
-            <div class="ai-persistent-status-item">
-              <div class="ai-persistent-status-label">Estado</div>
-              <div class="ai-persistent-status-value" style="color: ${respuesta.colorEstado};">${respuesta.estado}</div>
-            </div>
-          </div>
-          
-          <div class="ai-persistent-message-text">
-            ${respuesta.mensaje.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
-          </div>
-          
-          <div class="ai-persistent-footer">
-            <button class="ai-persistent-btn ai-persistent-btn-primary" onclick="cerrarMensajeIA()">
-              <i class="fas fa-check"></i> Entendido
-            </button>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(mensajeDiv);
-      mensajePersistenteActual = mensajeDiv;
-    }
-
-    // Función para cerrar el mensaje
-    function cerrarMensajeIA() {
-      if (mensajePersistenteActual) {
-        mensajePersistenteActual.style.animation = 'slideOutRight 0.5s ease forwards';
-        setTimeout(() => {
-          if (mensajePersistenteActual && mensajePersistenteActual.parentNode) {
-            mensajePersistenteActual.parentNode.removeChild(mensajePersistenteActual);
-            mensajePersistenteActual = null;
-          }
-        }, 500);
-      }
-    }
-
-    // =============================================
-    // MODAL DE ÉXITO CORREGIDO - SIN AUTO-CIERRE
-    // =============================================
-    
-    function mostrarMensajeExito() {
-      // Crear modal de éxito
-      const modal = document.createElement('div');
-      modal.id = 'modal-exito';
-      modal.className = 'modal-exito';
-      
-      modal.innerHTML = `
-        <div class="modal-exito-content">
-          <h2 style="color: #4CAF50; margin-bottom: 20px;">
-            <i class="fas fa-check-circle"></i> ¡Reporte enviado exitosamente!
-          </h2>
-          
-          <div style="
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: left;
-          ">
-            <p style="margin-bottom: 15px;">
-              <strong>Se ha enviado una notificación a:</strong><br>
-              <span style="color: #2196F3;">${TU_EMAIL}</span>
-            </p>
-            
-            <div style="
-              background: #e8f5e9;
-              border-left: 4px solid #4CAF50;
-              padding: 15px;
-              margin: 15px 0;
-            ">
-              <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Reporte ID</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-family: monospace; font-size: 12px;">${ultimoReporteId || 'Generando...'}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Estado</strong></td>
-                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd; color: #2196F3;">Visible para todos</td>
-                </tr>
-                <tr>
-                  <td style="padding: 8px 0;"><strong>Sincronizado</strong></td>
-                  <td style="padding: 8px 0; color: #4CAF50;"><i class="fas fa-check"></i> En tiempo real</td>
-                </tr>
-              </table>
-            </div>
-            
-            <p style="font-size: 14px; color: #666; line-height: 1.6;">
-              <i class="fas fa-info-circle"></i> <strong>Tu reporte ya está disponible</strong> para que otros usuarios lo vean en la lista de reportes recientes.
-            </p>
-          </div>
-          
-          <div style="margin-top: 25px;">
-            <button onclick="cerrarMensajeExito()" style="
-              background: #4CAF50;
-              color: white;
-              border: none;
-              padding: 12px 30px;
-              border-radius: 8px;
-              cursor: pointer;
-              font-weight: bold;
-              font-size: 16px;
-              margin-right: 10px;
-            ">
-              <i class="fas fa-check"></i> Aceptar
-            </button>
-            
-            <button onclick="nuevoReporte()" style="
-              background: #2196F3;
-              color: white;
-              border: none;
-              padding: 12px 25px;
-              border-radius: 8px;
-              cursor: pointer;
-              font-weight: bold;
-              font-size: 16px;
-            ">
-              <i class="fas fa-plus"></i> Nuevo Reporte
-            </button>
-          </div>
-          
-          <div style="margin-top: 20px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 15px;">
-            <p>
-              <i class="fas fa-users"></i> <strong>Compartido con la comunidad:</strong> Tu reporte ayuda a mejorar la seguridad para todos en Matehuala.
-            </p>
-          </div>
-        </div>
-      `;
-      
-      document.body.appendChild(modal);
-      
-      // Permitir scroll detrás del modal
-      document.body.style.overflow = 'hidden';
-    }
-
-    function cerrarMensajeExito() {
-      const modal = document.getElementById('modal-exito');
-      if (modal) {
-        modal.style.animation = 'slideOutUp 0.5s ease forwards';
-        setTimeout(() => {
-          if (modal && modal.parentNode) {
-            document.body.removeChild(modal);
-          }
-        }, 500);
-      }
-      document.body.style.overflow = 'auto';
-    }
-
-    function nuevoReporte() {
-      cerrarMensajeExito();
-      location.reload();
-    }
-
-    // =============================================
-    // SISTEMA DE REPORTES VISUAL - SOLO REPORTES REALES
-    // =============================================
-    
-    function actualizarListaReportes(reportes) {
-      const lista = document.getElementById('lista-reportes');
-      
-      // Filtrar solo reportes reales
-      const reportesReales = reportes.filter(r => r.esReal !== false);
-      
-      if (reportesReales.length === 0) {
-        mostrarListaVacia();
-        return;
-      }
-
-      // Ordenar por timestamp (más recientes primero)
-      reportesReales.sort((a, b) => b.timestamp - a.timestamp);
-      
-      // Limitar a 10 reportes
-      const reportesMostrar = reportesReales.slice(0, 10);
-      
-      lista.innerHTML = '';
-      
-      reportesMostrar.forEach(reporte => {
-        const tiempo = calcularTiempoTranscurrido(new Date(reporte.timestamp));
-        const tieneImagen = reporte.tieneImagen ? ' 📷' : '';
-        const status = reporte.status || 'pendiente';
-        const statusText = status === 'pendiente' ? 'Pendiente' :
-                          status === 'en-proceso' ? 'En proceso' : 'Resuelto';
-        const statusClass = status === 'pendiente' ? 'status-pendiente' :
-                           status === 'en-proceso' ? 'status-en-proceso' : 'status-resuelto';
-        
-        const item = document.createElement('div');
-        item.className = `report-item ${reporte.tipo}`;
-        item.onclick = () => mostrarDetalleReporte(reporte);
-        item.style.cursor = 'pointer';
-        
-        // Mostrar solo primer nombre
-        const nombreMostrar = reporte.nombre.split(' ')[0];
-        
-        item.innerHTML = `
-          <div style="display: flex; justify-content: space-between; align-items: start;">
-            <div class="report-type ${reporte.tipo}">
-              ${reporte.tipo === 'bache' ? 'Bache' : 'Alumbrado'}
-            </div>
-            <span class="report-status ${statusClass}">${statusText}</span>
-          </div>
-          <div class="report-location">${reporte.ubicacion}</div>
-          <div class="report-desc">${reporte.descripcion || 'Reporte enviado'}${tieneImagen}</div>
-          <div class="report-time">Reportado por ${nombreMostrar} • ${tiempo}</div>
-        `;
-        lista.appendChild(item);
-      });
-
-      // Mostrar contador REAL
-      const contador = document.createElement('div');
-      contador.style.cssText = `
-        text-align: center;
-        margin-top: 20px;
-        padding: 10px;
-        background: rgba(255,255,255,0.1);
-        border-radius: 8px;
-        font-size: 14px;
-      `;
-      contador.innerHTML = `
-        <i class="fas fa-users"></i> ${reportesReales.length} reportes reales de la comunidad
-        <br><small style="color: #aaa;">Actualizado en tiempo real</small>
-      `;
-      lista.appendChild(contador);
-    }
-
-    // El resto del código permanece igual (funciones del mapa, navegación, etc.)
-    // Solo muestro las partes modificadas para no hacer demasiado largo el código
-
-    // =============================================
-    // FUNCIONES DEL MAPA Y FORMULARIOS (IGUAL)
-    // =============================================
-    
-    function inicializarMapa() {
-      if (mapaInicializado) return;
-      
-      try {
-        document.getElementById('map-loading').style.display = 'none';
-        
-        mapa = L.map('map').setView([23.6482, -100.6430], 14);
-
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© OpenStreetMap contributors',
-          maxZoom: 19
-        }).addTo(mapa);
-
-        marcador = L.marker([23.6482, -100.6430], {
-          draggable: true
-        }).addTo(mapa)
-          .bindPopup('Ubicación del reporte')
-          .openPopup();
-
-        marcador.on('dragend', function(e) {
-          const posicion = marcador.getLatLng();
-          coordenadasSeleccionadas = { lat: posicion.lat, lng: posicion.lng };
-          actualizarCoordenadas();
-        });
-
-        mapa.on('click', function(e) {
-          marcador.setLatLng(e.latlng);
-          coordenadasSeleccionadas = { lat: e.latlng.lat, lng: e.latlng.lng };
-          actualizarCoordenadas();
-        });
-
-        mapaInicializado = true;
-        
-      } catch (error) {
-        console.error('Error al inicializar el mapa:', error);
-        document.getElementById('map-loading').innerHTML = 
-          '<i class="fas fa-exclamation-triangle"></i> Error al cargar el mapa. Recarga la página.';
-      }
-    }
-
-    function actualizarCoordenadas() {
-      const coordenadasElemento = document.getElementById('coordenadas');
-      if (coordenadasElemento) {
-        coordenadasElemento.textContent = 
-          `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`;
-      }
-    }
-
-    // Navegación
     function seleccionarTipo(tipo) {
       tipoReporteSeleccionado = tipo;
       document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('selected'));
@@ -2111,6 +2069,14 @@
         alert("Por favor completa todos los campos obligatorios.");
         return;
       }
+      
+      // Validar teléfono
+      const telefonoRegex = /^[0-9]{10}$/;
+      if (!telefonoRegex.test(telefono)) {
+        alert("Por favor ingresa un número de teléfono válido de 10 dígitos.");
+        document.getElementById("telefono").focus();
+        return;
+      }
 
       document.getElementById('form-ubicacion').style.display = 'none';
       
@@ -2121,7 +2087,10 @@
       }
     });
 
-    // Configurar vista previa de imágenes
+    // =============================================
+    // MANEJO DE IMÁGENES
+    // =============================================
+    
     document.getElementById('fotoBache').addEventListener('change', function() {
       configurarVistaPrevia('bache', this);
     });
@@ -2147,7 +2116,10 @@
       }
     }
 
-    // Manejar envío de formularios de detalles
+    // =============================================
+    // ENVÍO DE REPORTES
+    // =============================================
+    
     document.getElementById('form-detalles-bache').addEventListener('submit', function(e) {
       e.preventDefault();
       manejarEnvioReporte();
@@ -2158,7 +2130,6 @@
       manejarEnvioReporte();
     });
 
-    // Función principal de envío - MODIFICADA para mostrar IA después
     async function manejarEnvioReporte() {
       // Validar campos según el tipo
       let archivo = null;
@@ -2175,12 +2146,10 @@
           return;
         }
 
-        detalles = `
-Tamaño: ${tamano} metros
+        detalles = `Tamaño: ${tamano} metros
 Profundidad: ${profundidad} cm
 Peligrosidad: ${peligrosidad}
-Comentarios: ${document.getElementById("comentarios-bache").value || 'No proporcionado'}
-        `;
+Comentarios: ${document.getElementById("comentarios-bache").value || 'No proporcionado'}`;
       } else {
         const tipoProblema = document.getElementById("tipo-problema-alumbrado").value;
         const urgencia = document.getElementById("urgencia-alumbrado").value;
@@ -2191,12 +2160,10 @@ Comentarios: ${document.getElementById("comentarios-bache").value || 'No proporc
           return;
         }
 
-        detalles = `
-Tipo de problema: ${document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text}
+        detalles = `Tipo de problema: ${document.getElementById("tipo-problema-alumbrado").selectedOptions[0].text}
 Número de poste: ${document.getElementById("numero-poste").value || 'No proporcionado'}
 Urgencia: ${urgencia}
-Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No proporcionado'}
-        `;
+Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No proporcionado'}`;
       }
 
       // Mostrar loading
@@ -2212,6 +2179,15 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
         const email = document.getElementById("email").value;
         const ubicacionTexto = document.getElementById("ubicacion-texto").value;
         
+        // Validar teléfono nuevamente
+        const telefonoRegex = /^[0-9]{10}$/;
+        if (!telefonoRegex.test(telefono)) {
+          alert("Por favor ingresa un número de teléfono válido de 10 dígitos.");
+          document.getElementById(loadingId).style.display = 'none';
+          document.getElementById(buttonId).style.display = 'block';
+          return;
+        }
+        
         // Crear objeto para el reporte
         const nuevoReporte = {
           tipo: tipoReporteSeleccionado,
@@ -2225,18 +2201,14 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
           coordenadas: coordenadasSeleccionadas,
           detalles: detalles,
           tieneImagen: !!archivo,
-          dispositivo: navigator.userAgent,
-          status: 'pendiente',
-          publico: true,
-          visible: true,
-          esReal: true
+          dispositivo: navigator.userAgent
         };
 
         // Guardar imagen localmente si existe
         if (archivo) {
           const reader = new FileReader();
           reader.onload = async function(e) {
-            // Guardar imagen en localStorage como respaldo
+            // Guardar imagen en localStorage
             const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
             const imagenId = 'img_' + Date.now();
             imagenesGuardadas[imagenId] = {
@@ -2257,8 +2229,8 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
               nombreArchivo: archivo.name
             });
 
-            // Preparar datos para el email
-            const templateParams = {
+            // Enviar email
+            await enviarEmailFinal({
               to_email: TU_EMAIL,
               tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
               fecha: new Date().toLocaleString('es-MX'),
@@ -2271,14 +2243,11 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
               tiene_imagen: 'SÍ',
               imagen_id: imagenId,
               nombre_archivo: archivo.name,
-              mensaje_imagen: '📸 IMAGEN GUARDADA LOCALMENTE - Use el panel administrativo para verla',
+              mensaje_imagen: '📸 IMAGEN GUARDADA LOCALMENTE',
               reply_to: email || TU_EMAIL
-            };
-
-            // Enviar email
-            await enviarEmailFinal(templateParams);
+            });
             
-            // Mostrar respuesta de la IA DESPUÉS del email
+            // Mostrar respuesta de la IA
             const respuestaIA = await generarRespuestaIA(nuevoReporte);
             setTimeout(() => {
               mostrarRespuestaIAPersistente(respuestaIA);
@@ -2290,11 +2259,11 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
           };
           reader.readAsDataURL(archivo);
         } else {
-          // Guardar reporte en Firebase sin imagen
+          // Guardar reporte sin imagen
           const reporteId = await guardarReporteEnFirebase(nuevoReporte);
 
-          // Preparar datos para el email
-          const templateParams = {
+          // Enviar email
+          await enviarEmailFinal({
             to_email: TU_EMAIL,
             tipo_reporte: tipoReporteSeleccionado === 'bache' ? 'BACHE' : 'ALUMBRADO PÚBLICO',
             fecha: new Date().toLocaleString('es-MX'),
@@ -2306,11 +2275,9 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
             detalles: detalles,
             tiene_imagen: 'NO',
             reply_to: email || TU_EMAIL
-          };
-
-          await enviarEmailFinal(templateParams);
+          });
           
-          // Mostrar respuesta de la IA DESPUÉS del email
+          // Mostrar respuesta de la IA
           const respuestaIA = await generarRespuestaIA(nuevoReporte);
           setTimeout(() => {
             mostrarRespuestaIAPersistente(respuestaIA);
@@ -2328,7 +2295,6 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
       }
     }
 
-    // Función para enviar el email final
     async function enviarEmailFinal(templateParams) {
       try {
         const resultado = await emailjs.send(
@@ -2337,39 +2303,493 @@ Comentarios: ${document.getElementById("comentarios-alumbrado").value || 'No pro
           templateParams
         );
 
-        console.log("Email enviado exitosamente:", resultado);
+        console.log("✅ Email enviado exitosamente:", resultado);
         return true;
 
       } catch (error) {
-        console.error('Error al enviar el email:', error);
-        // No mostrar error al usuario, continuar con el proceso
+        console.error('❌ Error al enviar el email:', error);
         return false;
       }
     }
 
-    // Función para calcular tiempo transcurrido
-    function calcularTiempoTranscurrido(timestamp) {
-      const ahora = new Date();
-      const diferencia = ahora - timestamp;
-      const minutos = Math.floor(diferencia / (1000 * 60));
-      const horas = Math.floor(diferencia / (1000 * 60 * 60));
-      const dias = Math.floor(diferencia / (1000 * 60 * 60 * 24));
+    // =============================================
+    // FUNCIONES DEL MAPA
+    // =============================================
+    
+    function inicializarMapa() {
+      if (mapaInicializado) return;
+      
+      try {
+        document.getElementById('map-loading').style.display = 'none';
+        
+        mapa = L.map('map').setView([23.6482, -100.6430], 14);
 
-      if (dias > 0) {
-        return `Hace ${dias} día${dias > 1 ? 's' : ''}`;
-      } else if (horas > 0) {
-        return `Hace ${horas} hora${horas > 1 ? 's' : ''}`;
-      } else if (minutos > 0) {
-        return `Hace ${minutos} minuto${minutos > 1 ? 's' : ''}`;
-      } else {
-        return 'Hace unos momentos';
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(mapa);
+
+        marcador = L.marker([23.6482, -100.6430], {
+          draggable: true
+        }).addTo(mapa)
+          .bindPopup('Ubicación del reporte')
+          .openPopup();
+
+        marcador.on('dragend', function(e) {
+          const posicion = marcador.getLatLng();
+          coordenadasSeleccionadas = { lat: posicion.lat, lng: posicion.lng };
+          actualizarCoordenadas();
+        });
+
+        mapa.on('click', function(e) {
+          marcador.setLatLng(e.latlng);
+          coordenadasSeleccionadas = { lat: e.latlng.lat, lng: e.latlng.lng };
+          actualizarCoordenadas();
+        });
+
+        mapaInicializado = true;
+        
+      } catch (error) {
+        console.error('Error al inicializar el mapa:', error);
+        document.getElementById('map-loading').innerHTML = 
+          '<i class="fas fa-exclamation-triangle"></i> Error al cargar el mapa. Recarga la página.';
       }
     }
 
-    // El resto de funciones (AI chat, mostrarDetalleReporte, etc.) permanecen igual
-    // Solo mostré las partes modificadas para solucionar los problemas específicos
+    function actualizarCoordenadas() {
+      const coordenadasElemento = document.getElementById('coordenadas');
+      if (coordenadasElemento) {
+        coordenadasElemento.textContent = 
+          `${coordenadasSeleccionadas.lat.toFixed(4)}° N, ${Math.abs(coordenadasSeleccionadas.lng).toFixed(4)}° O`;
+      }
+    }
 
-    // ... (El resto del código JavaScript permanece igual)
+    // =============================================
+    // SISTEMA DE IA
+    // =============================================
+    
+    async function generarRespuestaIA(reporte) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const tipo = reporte.tipo === 'bache' ? 'bache' : 'problema de alumbrado';
+      const ubicacion = reporte.ubicacion;
+      const nombre = reporte.nombre.split(' ')[0];
+      const fecha = new Date().toLocaleDateString('es-MX');
+      const hora = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      
+      let prioridad = 'Media';
+      let tiempoEstimado = '2-3 días';
+      let estado = 'En proceso';
+      let iconoEstado = '✅';
+      let colorEstado = '#4CAF50';
+      let colorPrioridad = '#ff9800';
+      
+      if (reporte.tipo === 'bache') {
+        if (reporte.detalles.includes('Peligrosidad: Alta')) {
+          prioridad = 'Alta';
+          tiempoEstimado = '24 horas';
+          estado = 'Urgente';
+          iconoEstado = '🚨';
+          colorEstado = '#f44336';
+          colorPrioridad = '#f44336';
+        } else if (reporte.detalles.includes('Peligrosidad: Media')) {
+          prioridad = 'Media';
+          tiempoEstimado = '2-3 días';
+          estado = 'En proceso';
+          iconoEstado = '⚠️';
+          colorEstado = '#ff9800';
+          colorPrioridad = '#ff9800';
+        }
+      } else {
+        if (reporte.detalles.includes('Urgencia: Alta') || 
+            reporte.detalles.includes('cable suelto')) {
+          prioridad = 'Alta';
+          tiempoEstimado = '24-48 horas';
+          estado = 'Urgente';
+          iconoEstado = '🚨';
+          colorEstado = '#f44336';
+          colorPrioridad = '#f44336';
+        } else if (reporte.detalles.includes('Urgencia: Media')) {
+          prioridad = 'Media';
+          tiempoEstimado = '3-4 días';
+          estado = 'En proceso';
+          iconoEstado = '⚠️';
+          colorEstado = '#ff9800';
+          colorPrioridad = '#ff9800';
+        }
+      }
+      
+      const mensaje = `Hola ${nombre},\n\n` +
+                     `${iconoEstado} **Tu reporte ha sido recibido correctamente**\n\n` +
+                     `📍 **Ubicación:** ${ubicacion}\n` +
+                     `📅 **Fecha y hora:** ${fecha} a las ${hora}\n` +
+                     `📊 **Prioridad asignada:** ${prioridad}\n` +
+                     `⏱️ **Tiempo estimado de atención:** ${tiempoEstimado}\n` +
+                     `📋 **Estado actual:** ${estado}\n\n` +
+                     `✅ **Tu reporte ya es visible para otras personas**\n` +
+                     `👥 **Otros usuarios pueden verlo en la lista de reportes**\n\n` +
+                     `🙏 **Gracias por ayudar a mejorar Matehuala.**`;
+      
+      return {
+        prioridad: prioridad,
+        tiempoEstimado: tiempoEstimado,
+        estado: estado,
+        iconoEstado: iconoEstado,
+        colorEstado: colorEstado,
+        colorPrioridad: colorPrioridad,
+        fecha: fecha,
+        hora: hora,
+        nombre: nombre,
+        tipo: tipo,
+        ubicacion: ubicacion,
+        mensaje: mensaje,
+        puedeAtender: true
+      };
+    }
+
+    function mostrarRespuestaIAPersistente(respuesta) {
+      if (mensajePersistenteActual) {
+        mensajePersistenteActual.remove();
+      }
+      
+      const mensajeDiv = document.createElement('div');
+      mensajeDiv.className = 'ai-persistent-message';
+      mensajeDiv.id = 'ai-persistent-message';
+      
+      mensajeDiv.innerHTML = `
+        <div class="ai-persistent-header" style="background: linear-gradient(135deg, ${respuesta.colorEstado}, ${respuesta.colorPrioridad});">
+          <h3>
+            <i class="fas fa-robot"></i>
+            Respuesta de BacheLight AI
+          </h3>
+          <button class="ai-persistent-close" onclick="cerrarMensajeIA()" title="Cerrar mensaje">
+            ✖
+          </button>
+        </div>
+        <div class="ai-persistent-content">
+          <div class="ai-persistent-status">
+            <div class="ai-persistent-status-item">
+              <div class="ai-persistent-status-label">Prioridad</div>
+              <div class="ai-persistent-status-value" style="color: ${respuesta.colorPrioridad};">${respuesta.prioridad}</div>
+            </div>
+            <div class="ai-persistent-status-item">
+              <div class="ai-persistent-status-label">Tiempo estimado</div>
+              <div class="ai-persistent-status-value" style="color: #2196F3;">${respuesta.tiempoEstimado}</div>
+            </div>
+            <div class="ai-persistent-status-item">
+              <div class="ai-persistent-status-label">Estado</div>
+              <div class="ai-persistent-status-value" style="color: ${respuesta.colorEstado};">${respuesta.estado}</div>
+            </div>
+          </div>
+          
+          <div class="ai-persistent-message-text">
+            ${respuesta.mensaje.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}
+          </div>
+          
+          <div class="ai-persistent-footer">
+            <button class="ai-persistent-btn ai-persistent-btn-primary" onclick="cerrarMensajeIA()">
+              <i class="fas fa-check"></i> Entendido
+            </button>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(mensajeDiv);
+      mensajePersistenteActual = mensajeDiv;
+    }
+
+    function cerrarMensajeIA() {
+      if (mensajePersistenteActual) {
+        mensajePersistenteActual.style.animation = 'slideOutRight 0.5s ease forwards';
+        setTimeout(() => {
+          if (mensajePersistenteActual && mensajePersistenteActual.parentNode) {
+            mensajePersistenteActual.parentNode.removeChild(mensajePersistenteActual);
+            mensajePersistenteActual = null;
+          }
+        }, 500);
+      }
+    }
+
+    // =============================================
+    // MODAL DE ÉXITO
+    // =============================================
+    
+    function mostrarMensajeExito() {
+      const modal = document.createElement('div');
+      modal.id = 'modal-exito';
+      modal.className = 'modal-exito';
+      
+      const fechaHoy = new Date().toLocaleDateString('es-MX', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      
+      modal.innerHTML = `
+        <div class="modal-exito-content">
+          <h2 style="color: #4CAF50; margin-bottom: 20px;">
+            <i class="fas fa-check-circle"></i> ¡Reporte enviado exitosamente!
+          </h2>
+          
+          <div style="
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+          ">
+            <p style="margin-bottom: 15px;">
+              <strong>Se ha enviado una notificación a:</strong><br>
+              <span style="color: #2196F3;">${TU_EMAIL}</span>
+            </p>
+            
+            <div style="
+              background: #e8f5e9;
+              border-left: 4px solid #4CAF50;
+              padding: 15px;
+              margin: 15px 0;
+            ">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Fecha</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-weight: bold;">${fechaHoy}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Reporte ID</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd; font-family: monospace; font-size: 12px;">${ultimoReporteId || 'Generando...'}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd;"><strong>Estado</strong></td>
+                  <td style="padding: 8px 0; border-bottom: 1px solid #ddd; color: #2196F3;">Visible para todos</td>
+                </tr>
+                <tr>
+                  <td style="padding: 8px 0;"><strong>Sincronizado</strong></td>
+                  <td style="padding: 8px 0; color: #4CAF50;"><i class="fas fa-check"></i> En tiempo real</td>
+                </tr>
+              </table>
+            </div>
+            
+            <p style="font-size: 14px; color: #666; line-height: 1.6;">
+              <i class="fas fa-info-circle"></i> <strong>Tu reporte ya está disponible</strong> para que otros usuarios lo vean en la lista de reportes recientes de hoy.
+            </p>
+          </div>
+          
+          <div style="margin-top: 25px;">
+            <button onclick="cerrarMensajeExito()" style="
+              background: #4CAF50;
+              color: white;
+              border: none;
+              padding: 12px 30px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 16px;
+              margin-right: 10px;
+            ">
+              <i class="fas fa-check"></i> Aceptar
+            </button>
+            
+            <button onclick="nuevoReporte()" style="
+              background: #2196F3;
+              color: white;
+              border: none;
+              padding: 12px 25px;
+              border-radius: 8px;
+              cursor: pointer;
+              font-weight: bold;
+              font-size: 16px;
+            ">
+              <i class="fas fa-plus"></i> Nuevo Reporte
+            </button>
+          </div>
+          
+          <div style="margin-top: 20px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 15px;">
+            <p>
+              <i class="fas fa-users"></i> <strong>Compartido con la comunidad:</strong> Tu reporte ayuda a mejorar la seguridad para todos en Matehuala.
+            </p>
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      document.body.style.overflow = 'hidden';
+    }
+
+    function cerrarMensajeExito() {
+      const modal = document.getElementById('modal-exito');
+      if (modal) {
+        modal.style.animation = 'slideOutUp 0.5s ease forwards';
+        setTimeout(() => {
+          if (modal && modal.parentNode) {
+            document.body.removeChild(modal);
+          }
+        }, 500);
+      }
+      document.body.style.overflow = 'auto';
+    }
+
+    function nuevoReporte() {
+      cerrarMensajeExito();
+      location.reload();
+    }
+
+    // =============================================
+    // FUNCIONES ADICIONALES
+    // =============================================
+    
+    function mostrarDetalleReporte(reporte) {
+      const fecha = reporte.timestamp ? new Date(reporte.timestamp).toLocaleString('es-MX') : 'Fecha no disponible';
+      const detalles = reporte.detalles || 'Sin detalles adicionales';
+      
+      alert(`Detalles del reporte:\n\n` +
+            `Tipo: ${reporte.tipo === 'bache' ? 'Bache' : 'Alumbrado'}\n` +
+            `Ubicación: ${reporte.ubicacion}\n` +
+            `Descripción: ${reporte.descripcion}\n` +
+            `Reportado por: ${reporte.nombre}\n` +
+            `Fecha: ${fecha}\n` +
+            `Estado: ${reporte.status || 'pendiente'}\n\n` +
+            `Detalles:\n${detalles}\n\n` +
+            `📞 Contacto: ${reporte.telefono}`);
+    }
+
+    function toggleAIChat() {
+      const chat = document.getElementById('ai-chat');
+      if (chat.style.display === 'block') {
+        chat.style.display = 'none';
+        chatAbierto = false;
+      } else {
+        chat.style.display = 'block';
+        chatAbierto = true;
+        if (reportesHoy.length > 0) {
+          document.getElementById('ai-badge').style.display = 'none';
+        }
+      }
+    }
+
+    function handleAIKeyPress(event) {
+      if (event.key === 'Enter') {
+        sendAIMessage();
+      }
+    }
+
+    function sendAIMessage() {
+      const input = document.getElementById('ai-input');
+      const message = input.value.trim();
+      
+      if (!message) return;
+      
+      const messagesDiv = document.getElementById('ai-messages');
+      const userMessage = document.createElement('div');
+      userMessage.className = 'message user';
+      userMessage.textContent = message;
+      messagesDiv.appendChild(userMessage);
+      
+      input.value = '';
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      
+      setTimeout(() => {
+        const respuesta = generarRespuestaChat(message);
+        const aiMessage = document.createElement('div');
+        aiMessage.className = 'message ai';
+        aiMessage.innerHTML = respuesta;
+        messagesDiv.appendChild(aiMessage);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }, 1000);
+    }
+
+    function generarRespuestaChat(pregunta) {
+      pregunta = pregunta.toLowerCase();
+      
+      if (pregunta.includes('cuántos') || pregunta.includes('cuantos') || pregunta.includes('reportes')) {
+        return `Actualmente hay <strong>${reportesHoy.length} reportes</strong> registrados hoy.<br>
+                <ul style="margin-left: 20px; margin-top: 5px;">
+                  <li>Baches: ${reportesHoy.filter(r => r.tipo === 'bache').length}</li>
+                  <li>Alumbrado: ${reportesHoy.filter(r => r.tipo === 'alumbrado').length}</li>
+                </ul>`;
+      }
+      
+      if (pregunta.includes('tiempo') || pregunta.includes('espera')) {
+        return `Los tiempos de atención aproximados son:<br>
+                <ul style="margin-left: 20px; margin-top: 5px;">
+                  <li><strong>Prioridad Alta:</strong> 24-48 horas</li>
+                  <li><strong>Prioridad Media:</strong> 2-3 días</li>
+                  <li><strong>Prioridad Baja:</strong> 5-7 días</li>
+                </ul>`;
+      }
+      
+      if (pregunta.includes('ayuda') || pregunta.includes('cómo') || pregunta.includes('como')) {
+        return `Para hacer un reporte:<br>
+                1. Selecciona el tipo (Bache o Alumbrado)<br>
+                2. Ingresa tus datos y la ubicación<br>
+                3. Describe el problema y sube una foto<br>
+                4. ¡Listo! Tu reporte será visible para todos<br><br>
+                <small>💡 Los reportes solo se muestran del día de hoy.</small>`;
+      }
+      
+      return `Puedo ayudarte con información sobre:<br>
+              • Cantidad de reportes del día de hoy<br>
+              • Tiempos estimados de atención<br>
+              • Cómo hacer un reporte<br>
+              • Estado de reportes<br><br>
+              <small>Actualmente hay ${reportesHoy.length} reportes registrados hoy.</small>`;
+    }
+
+    function mostrarAdministrador() {
+      const panel = document.getElementById('admin-panel');
+      panel.style.display = 'block';
+      cargarImagenesReportes();
+    }
+
+    function cerrarAdministrador() {
+      document.getElementById('admin-panel').style.display = 'none';
+    }
+
+    function cargarImagenesReportes() {
+      const lista = document.getElementById('lista-imagenes');
+      const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
+      
+      lista.innerHTML = '<h3>Imágenes guardadas localmente</h3>';
+      
+      if (Object.keys(imagenesGuardadas).length === 0) {
+        lista.innerHTML += '<p>No hay imágenes guardadas.</p>';
+        return;
+      }
+      
+      Object.keys(imagenesGuardadas).forEach(id => {
+        const imagen = imagenesGuardadas[id];
+        const item = document.createElement('div');
+        item.className = 'admin-image-item';
+        item.innerHTML = `
+          <p><strong>Reporte:</strong> ${imagen.reporte}</p>
+          <p><strong>Tipo:</strong> ${imagen.tipo === 'bache' ? 'Bache' : 'Alumbrado'}</p>
+          <p><strong>Fecha:</strong> ${new Date(imagen.fecha).toLocaleString('es-MX')}</p>
+          <img src="${imagen.data}" alt="Imagen del reporte">
+          <button class="admin-delete-btn" onclick="eliminarImagen('${id}')">Eliminar</button>
+        `;
+        lista.appendChild(item);
+      });
+    }
+
+    function eliminarImagen(id) {
+      const imagenesGuardadas = JSON.parse(localStorage.getItem('imagenes_reportes') || '{}');
+      delete imagenesGuardadas[id];
+      localStorage.setItem('imagenes_reportes', JSON.stringify(imagenesGuardadas));
+      cargarImagenesReportes();
+    }
+
+    // =============================================
+    // INICIALIZACIÓN FINAL
+    // =============================================
+    
+    console.log("✅ Sistema BacheLight completamente funcional");
+    console.log("📊 Características activas:");
+    console.log("- Reportes en tiempo real");
+    console.log("- Solo reportes de hoy");
+    console.log("- Teléfono: 10 dígitos máximo");
+    console.log("- Respaldo en localStorage");
+    console.log("- Notificaciones automáticas");
+    console.log("- Asistente IA integrado");
 
   </script>
 </body>
